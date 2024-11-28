@@ -527,8 +527,14 @@ AVSValue __cdecl Create_amDCT(AVSValue args, void* user_data, IScriptEnvironment
 
 // The following function is the function that actually registers the filter in AviSynth
 // It is called automatically, when the plug in is loaded to see which functions this filter contains.
+/* New 2.6 requirement!!! */
+// Declare and initialise server pointers static storage.
+const AVS_Linkage* AVS_linkage = 0;
+// DLL entry point called from LoadPlugin() to setup a user plugin.
+extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit3(IScriptEnvironment * env, const AVS_Linkage* const vectors) {
+  // Save the server pointers.
+  AVS_linkage = vectors;
 
-extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment* env) {
 	env->AddFunction("amDCT", "c[pf1]c[bf1]c[quant]i[adapt]i[shift]i[matrix]i[qtype]i[sharpWPos]i[sharpWAmt]i[expand]i[sharpTPos]i[sharpTAmt]i[quality]i[brightStart]i[brightAmt]i[darkStart]i[darkAmt]i[showMask]i[T2]i[ncpu]i", Create_amDCT, 0);
 
 	// The AddFunction has the following parameters:
