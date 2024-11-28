@@ -867,7 +867,9 @@ uint32_t get_coeff8_energy_c(FrameInfo_args *FrameInfoArgs, uint8_t * src, int s
 	src = src + startPix;
 	transfer_8to16copy1_c(dct_block, src, stride);
 
-	fdct_sse2_skal(dct_block);
+// FIXME temporarily idct_int32 (plain C) is used intead of external asm fdct_sse2_skal
+	//fdct_sse2_skal(dct_block); // original
+	fdct_int32(dct_block);
 
 	return(coeff8_energy_c(dct_block));
 }

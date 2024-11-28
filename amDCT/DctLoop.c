@@ -17,6 +17,7 @@
 #include "dct\fdct.h"
 #include "quant\quant_matrix.h"
 
+#define USE_INTEL_INTRINSICS_DCTLOOP
 
 void init_intra_matrixF(uint16_t *mpeg_quant_matrices, float quant);
 
@@ -208,11 +209,13 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 				/*
 				 *  2: DO DCT ON THE BLOCK.
 				 */
-			//fdct_int32(dct_block);       // C version for testing.
+// FIXME: until external asm source is re-inserted in project.
+// Originally called fdct_sse2_skal asm, now fdct_int32 instead.
+			fdct_int32(dct_block);       // C version for testing.
 			//fdct_mmx_ffmpeg(dct_block);  // This mmx version works.
 			//fdct_mmx_skal(dct_block);    // This mmx version is faster.
 			//fdct_xmm_ffmpeg(dct_block);  // This xmm version also works even faster.                        
-			fdct_sse2_skal(dct_block);     // This sse2 is the fastest.  
+			//fdct_sse2_skal(dct_block);     // This sse2 is the fastest.  
 			
 			if (showMask == 18 || showMask == 19) {
 				memcpy(dct_blockOrig, dct_block, blockSize);
@@ -321,19 +324,38 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 					break;
 							
 				case 2:  
+#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+          // _c instead of asm FIXME: implement sse2 x64 friendly
+          quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+#else
 					  quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
 					dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+#endif
 					break;
 								
 				case 3:   
+#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+          // _c instead of asm FIXME: implement sse2 x64 friendly
+          quant_mpeg_inter_c(coeff_block, dct_block, quant, quant_inter_matrix);
+          dequant_mpeg_inter_c(dct_block, coeff_block, quant, quant_inter_matrix);
+#else
 					  quant_mpeg_inter_mmx(coeff_block, dct_block, quant, quant_inter_matrix); 
 					dequant_mpeg_inter_mmx(dct_block, coeff_block, quant, quant_inter_matrix);
+#endif
 					break;
 				
 				case 4:  
+#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+          // _c instead of asm FIXME: implement sse2 x64 friendly
+          quant_h263_inter_c(coeff_block, dct_block, quant, quant_intra_matrix);
+          dequant_h263_inter_c(dct_block, coeff_block, quant, quant_intra_matrix);
+#else
 					  quant_h263_inter_mmx(coeff_block, dct_block, quant, quant_intra_matrix);
 					dequant_h263_inter_mmx(dct_block, coeff_block, quant, quant_intra_matrix);
+#endif
 					break;
+          
 
 
 		
@@ -403,8 +425,13 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 				
 									
 				default:
+#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+          quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+#else
 					  quant_h263_intra_mmx(coeff_block, dct_block, quant, 1, quant_intra_matrix);
 					dequant_h263_intra_mmx(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+#endif
 					break;
 					
 				} // end switch
@@ -422,11 +449,12 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 				/*	
 				 *  4: DO iDCT ON THE BLOCK 
 				 */
+// temporarily use C (simple_idct_c) instead of external asm idct_sse2_skal
 			//idct_int32(dct_block);      // C version for testing.
-			//simple_idct_c(dct_block);   // C version for testing.
+			simple_idct_c(dct_block);   // C version for testing. (more precise)
 			//idct_mmx(dct_block);        // This works.
 			//idct_xmm(dct_block);        // This works faster.
-			idct_sse2_skal(dct_block);    // This works fastest.
+			//idct_sse2_skal(dct_block);    // This works fastest.
 
 
 
