@@ -19,14 +19,20 @@
 #include "Font.h"
 
 #include <malloc.h>
+#include "emmintrin.h"
 
-
-
+#ifdef ARCH_IS_IA32
 #define FREE_AND_RETURN_0            \
 	free_data(&FrameInfoArgs);       \
 	_aligned_free(pictSrcBufFull);   \
-	__asm { emms }                   \
+	_mm_empty(); \
 	return(0);
+#else
+#define FREE_AND_RETURN_0            \
+	free_data(&FrameInfoArgs);       \
+	_aligned_free(pictSrcBufFull);   \
+	return(0);
+#endif
 
 
 // THESE ARE GLOBAL DEBUGGING VARIABLES
@@ -477,7 +483,9 @@ int				ncpu_a) {
 //		DrawYV12(pdst, dst_height, dst_width, 0, 1, msgBuf);
 
 		_aligned_free(pictSrcBufFull);
-		__asm { emms }
+#ifdef ARCH_IS_IA32
+		_mm_empty();
+#endif
 		return(1); // Out of Memory
 	}
 

@@ -7,6 +7,7 @@
 #include "avgDctLoop.h"
 #include "Utilities.h"
 #include "BuildPreCompVals.h"
+#include "emmintrin.h"
 
 //__inline void avgAccum_xmm(uint8_t *dst, int16_t * const src, int32_t len, uint8_t round, uint8_t numShiftsHiBit);  BROKEN
 
@@ -263,7 +264,7 @@ uint8_t  avgDctLoopAccum(FrameInfo_args *FrameInfoArgs) {
 //		}
 //	}
 //
-//	__asm { emms }
+//	_mm_empty()
 //	return(0);
 //
 
@@ -618,7 +619,9 @@ uint8_t  avgDctLoopAccumSmoothed(FrameInfo_args *FrameInfoArgs) {
 	buildBrightProtectDifVals(BrightProtectDifArr, brightStart, brightAmt, maxSrc, expand);
 	FrameInfoArgs->buildBrightProtectDifValsDone = 1;
 
-	__asm { emms }
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 	return(0);
 }
 
@@ -628,7 +631,7 @@ uint8_t  avgDctLoopAccumSmoothed(FrameInfo_args *FrameInfoArgs) {
 //  THE _xmm VERSION OF THE LOOP IS BROKEN  SEE END OF THIS FILE
 //avgAccum_xmm(PsharpP, BF_accumP, src_height*src_width, round, numShiftsHiBit);
 //
-//	__asm { emms }
+//	_mm_empty()
 //	return(0);
 
 
@@ -657,7 +660,9 @@ uint8_t  avgDctLoopAccumSharp(FrameInfo_args *FrameInfoArgs) {
 		}
 	}
 
-	__asm { emms }
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 	return(0);
 }
 
@@ -865,7 +870,9 @@ uint8_t  avgDctLoopAccumDCT(FrameInfo_args *FrameInfoArgs) {
 		BF_accumP    += src_width;
 	}
 
-	__asm { emms }
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 	return(0);
 }
 //*/

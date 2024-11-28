@@ -5,7 +5,7 @@
 #include "DispatchLoop.h"
 #include "DctLoop.h"
 #include "Threading.h"
-
+#include "emmintrin.h"
 
 /*
 // THIS IS CODE TO TEST USING MULTIPLE MOTION COMPENSATED FRAMES 
@@ -324,7 +324,9 @@ int   DispatchLoop(FrameInfo_args *FrameInfoArgs) {
 	
 		};
 	}
-	__asm { emms }
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 
 
 	return(0);

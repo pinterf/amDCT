@@ -210,7 +210,7 @@ int   amFilters(FrameInfo_args  *FrameInfoArgs) {
 		}
 
 //		free_data(FrameInfoArgs);
-//		__asm { emms }
+//		_mm_empty()
 		return(0);
 	}
 //
@@ -245,7 +245,7 @@ int   amFilters(FrameInfo_args  *FrameInfoArgs) {
 				UnDot(src_width, src_width, src_width, psrc, psrc, src_height);
 				if (showMask == SHOW_PRESMOOTH_2) { // DEBUG Pre Smoothing
 					copyFrameToDst(FrameInfoArgs, 5);
-					__asm { emms }
+					_mm_empty()
 					return(0);
 				}
 		}

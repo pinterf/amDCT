@@ -1,6 +1,7 @@
 #include <math.h>
 
 #include "transfer_add.h"
+#include <smmintrin.h> // SSE4.2
 
 /*
 void copy_add_8to16_len_c_2(uint16_t *dst, uint8_t *src, uint32_t len) {
@@ -205,6 +206,8 @@ void copy_add_16to32_dctblk_c(int32_t *dst,   // 32bit frame.
 	return;
 }
 
+#if 0
+// not used
 void copy_add_8to16_mmx(uint16_t *dst, const uint8_t * const src, uint32_t len) {
 	__asm {
 		ALIGN 16
@@ -228,7 +231,40 @@ void copy_add_8to16_mmx(uint16_t *dst, const uint8_t * const src, uint32_t len) 
 
 	return;
 }
+#endif
 
+#ifdef USE_NEW_INTRINSICS
+void copy_add_16to16_xmm(uint16_t* dst, uint16_t* const src, int32_t len) {
+  __m128i* dst_ptr = (__m128i*)dst;
+  __m128i* src_ptr = (__m128i*)src;
+  int32_t num_iterations = len / 32;
+
+  for (int i = 0; i < num_iterations; ++i) {
+    __m128i xmm0 = _mm_load_si128(&dst_ptr[0]);
+    __m128i xmm1 = _mm_load_si128(&src_ptr[0]);
+    __m128i xmm2 = _mm_load_si128(&dst_ptr[1]);
+    __m128i xmm3 = _mm_load_si128(&src_ptr[1]);
+    __m128i xmm4 = _mm_load_si128(&dst_ptr[2]);
+    __m128i xmm5 = _mm_load_si128(&src_ptr[2]);
+    __m128i xmm6 = _mm_load_si128(&dst_ptr[3]);
+    __m128i xmm7 = _mm_load_si128(&src_ptr[3]);
+
+    xmm0 = _mm_add_epi16(xmm0, xmm1);
+    xmm2 = _mm_add_epi16(xmm2, xmm3);
+    xmm4 = _mm_add_epi16(xmm4, xmm5);
+    xmm6 = _mm_add_epi16(xmm6, xmm7);
+
+    _mm_store_si128(&dst_ptr[0], xmm0);
+    _mm_store_si128(&dst_ptr[1], xmm2);
+    _mm_store_si128(&dst_ptr[2], xmm4);
+    _mm_store_si128(&dst_ptr[3], xmm6);
+
+    dst_ptr += 4;
+    src_ptr += 4;
+  }
+
+}
+#else
 void copy_add_16to16_xmm(uint16_t *dst, uint16_t * const src, int32_t len) {
 	__asm {
 		ALIGN 16
@@ -266,7 +302,10 @@ void copy_add_16to16_xmm(uint16_t *dst, uint16_t * const src, int32_t len) {
 
 	return;
 }
+#endif
 
+#if 0
+// not used
 void copy_add_16to16_mmx(uint16_t *dst, const uint16_t * const src, uint32_t len) {
 	__asm {
 		ALIGN 16
@@ -288,7 +327,39 @@ void copy_add_16to16_mmx(uint16_t *dst, const uint16_t * const src, uint32_t len
 
 	return;
 }
+#endif
 
+#ifdef USE_NEW_INTRINSICS
+void copy_add3_16to16_xmm(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
+  __m128i* dst_ptr = (__m128i*)dst;
+  __m128i* src1_ptr = (__m128i*)src1;
+  __m128i* src2_ptr = (__m128i*)src2;
+  uint32_t num_iterations = len / 16;
+
+  for (uint32_t i = 0; i < num_iterations; ++i) {
+    __m128i xmm0 = _mm_load_si128(&dst_ptr[0]);
+    __m128i xmm1 = _mm_load_si128(&src1_ptr[0]);
+    __m128i xmm2 = _mm_load_si128(&src2_ptr[0]);
+
+    __m128i xmm3 = _mm_load_si128(&dst_ptr[1]);
+    __m128i xmm4 = _mm_load_si128(&src1_ptr[1]);
+    __m128i xmm5 = _mm_load_si128(&src2_ptr[1]);
+
+    xmm0 = _mm_add_epi16(xmm0, xmm1);
+    xmm3 = _mm_add_epi16(xmm3, xmm4);
+    xmm0 = _mm_add_epi16(xmm0, xmm2);
+    xmm3 = _mm_add_epi16(xmm3, xmm5);
+
+    _mm_store_si128(&dst_ptr[0], xmm0);
+    _mm_store_si128(&dst_ptr[1], xmm3);
+
+    dst_ptr += 2;
+    src1_ptr += 2;
+    src2_ptr += 2;
+  }
+
+}
+#else
 void copy_add3_16to16_xmm(uint16_t *dst, uint16_t *src1, uint16_t *src2, uint32_t len) {
 	__asm {
 		ALIGN 16
@@ -326,7 +397,10 @@ void copy_add3_16to16_xmm(uint16_t *dst, uint16_t *src1, uint16_t *src2, uint32_
 
 	return;
 }
+#endif
 
+#if 0
+// not used, has other version
 void copy_add3_16to16_mmx(uint16_t *dst, const uint16_t * const src1, const uint16_t * const src2, uint32_t len) {
 	__asm {
 		ALIGN 16
@@ -352,7 +426,10 @@ void copy_add3_16to16_mmx(uint16_t *dst, const uint16_t * const src1, const uint
 
 	return;
 }
+#endif
 
+#if 0
+// not used
 //void copy_add4_16to16_xmm(uint16_t *dst, const uint16_t * const src1, const uint16_t * const src2, const uint16_t * const src3, uint32_t len){
 void copy_add4_16to16_xmm(uint16_t *dst, uint16_t * const src1, uint16_t * const src2, uint16_t * const src3, uint32_t len) {
 	__asm {
@@ -400,7 +477,10 @@ void copy_add4_16to16_xmm(uint16_t *dst, uint16_t * const src1, uint16_t * const
 
 	return;
 }
+#endif
 
+#if 0
+// not used
 void working_copy_add4_16to16_xmm(uint16_t *dst, const uint16_t * const src1, const uint16_t * const src2, const uint16_t * const src3, uint32_t len) {
 	__asm {
 		ALIGN 16
@@ -430,6 +510,7 @@ void working_copy_add4_16to16_xmm(uint16_t *dst, const uint16_t * const src1, co
 
 	return;
 }
+#endif
 
 /*
 void copy_add4_16to16_xmm(uint16_t *dst, const uint16_t * const src1, const uint16_t * const src2, const uint16_t * const src3, uint32_t len){
@@ -466,6 +547,8 @@ void copy_add4_16to16_xmm(uint16_t *dst, const uint16_t * const src1, const uint
 }
 */
 
+#if 0
+// not used
 //void copy_add4_16to16_mmx(uint16_t *dst, const uint16_t * const src1, const uint16_t * const src2, const uint16_t * const src3, uint32_t len){
 void copy_add4_16to16_mmx(uint16_t *dst, uint16_t * const src1, uint16_t * const src2, uint16_t * const src3, uint32_t len) {
 	__asm {
@@ -499,6 +582,7 @@ void copy_add4_16to16_mmx(uint16_t *dst, uint16_t * const src1, uint16_t * const
 
 	return;
 }
+#endif
 
 void copy_add4_16to16_c(uint16_t *dst, uint16_t * const src1, uint16_t * const src2, uint16_t * const src3, uint32_t len) {
 	uint32_t x;

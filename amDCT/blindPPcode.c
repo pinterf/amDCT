@@ -1,4 +1,7 @@
 #include  <math.h>
+#include <emmintrin.h> // Header for SSE2 intrinsics
+#include <tmmintrin.h> // Header for SSSE3 intrinsics
+#include <smmintrin.h> // SSE4.2
 
 #include "blindPPcode.h"
 #include "amDCTPortab.h"  // needed for uint32_t etc.  
@@ -81,9 +84,8 @@ int  deblock_horiz_useDC(uint8_t *v, int stride, int moderate_h);
 
 void deblock_vert_default_filter(uint8_t *v, int stride, int QP); 
 
-// NEW
-void deblock_vert_choose_p1p2(uint8_t *v, int stride, uint64_t *p1p2, int QP); 
 int deblock_vert_DC_on(uint8_t *v, int stride, int QP); 
+void deblock_vert_default_filter_c(uint8_t* v, int stride, int QP);
 void deblock_vert_default_filter_ORIGINAL(uint8_t *v, int stride, int QP); 
 
 const static uint64_t mm_fours  = 0x0004000400040004;
@@ -164,7 +166,9 @@ void deblock_horiz(uint8_t *image, int height, int width, int stride, int quant)
 			//deblock_horiz_lpf9(v, stride, quant); 
 		}
 	}
-	__asm emms;
+	#ifdef ARCH_IS_IA32
+	_mm_empty();
+	#endif
 	
 	return;
 }
@@ -229,7 +233,9 @@ void deblock_horiz_DoDC(uint8_t *image, int height, int width, int stride, int q
 			//deblock_horiz_lpf9(v, stride, quant); 
 		}
 	}
-	__asm emms;
+	#ifdef ARCH_IS_IA32
+	_mm_empty();
+	#endif
 	
 	return;
 }
@@ -326,6 +332,7 @@ void deblock_vert_DoDC( uint8_t *image, int height, int width, int stride, int q
 						v = &(image[y*stride + Bx])- 5*stride;
 						
 						/* copy the block we're working on and unpack to 16-bit values */
+						//deblock_vert_copy_and_unpack_c(stride, &(v[stride]), &(v_local[2]), 8); // test
 						deblock_vert_copy_and_unpack(stride, &(v[stride]), &(v_local[2]), 8);
 
 						deblock_vert_choose_p1p2(v, stride, p1p2, QP);
@@ -350,7 +357,9 @@ void deblock_vert_DoDC( uint8_t *image, int height, int width, int stride, int q
 			}
 		}
 	} 
-	__asm emms;
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 }
 
 ///* NEW VERSION
@@ -385,7 +394,7 @@ void deblock_vert_DoDC( uint8_t *image, int height, int width, int stride, int q
 //				}
 //			}
 //		} 
-//	__asm emms;
+//	_mm_empty()
 //
 //}
 
@@ -423,7 +432,9 @@ void deblock_vert( uint8_t *image, int height, int width, int stride, int quant)
 //				}
 			}
 		} 
-	__asm emms;
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 
 }
 
@@ -529,6 +540,8 @@ int deblock_horiz_default_filter(uint8_t *v, int stride, int QP)
 	return(1);
 }
 
+#ifndef USE_NEW_INTRINSICS
+
 const static uint64_t mm64_0008 = 0x0008000800080008;
 const static uint64_t mm64_0101 = 0x0101010101010101;
 static uint64_t mm64_temp;
@@ -544,13 +557,118 @@ const static uint64_t mm64_coefs[18] =  {
 	0x0001000000000000, /* v8 left */ 0x0006000400020001  /* p2 right */
 };
 static uint32_t mm32_p1p2;
+#endif
 //static uint8_t *pmm1;
 
 /* The 9-tap low pass filter used in "DC" regions */
 /* I'm not sure that I like this implementation any more...! */
+
+#ifdef USE_NEW_INTRINSICS
+void deblock_horiz_lpf9(uint8_t* v, int stride, int QP, const __m128i* mm64_coefs) {
+	int y, p1, p2;
+  __m128i mm32_p1p2, mm64_0008 = _mm_set1_epi16(8);
+  __m128i zero = _mm_setzero_si128();
+
+  for (y = 0; y < 4; y++) {
+    p1 = (abs(v[0 + y * stride] - v[1 + y * stride]) < QP) ? v[0 + y * stride] : v[1 + y * stride];
+    p2 = (abs(v[8 + y * stride] - v[9 + y * stride]) < QP) ? v[9 + y * stride] : v[8 + y * stride];
+    mm32_p1p2 = _mm_set1_epi16((p2 << 8) | p1);
+
+    __m128i* pmm1 = (__m128i*)(&(v[y * stride - 3])); /* this is 64-aligned */
+
+    __m128i mm0 = _mm_unpacklo_epi8(mm32_p1p2, mm32_p1p2); // mm0 = p2p2p2p2p1p1p1p1
+    __m128i mm2 = _mm_loadu_si128(pmm1); // mm2 = v4v3v2v1xxxxxxxx
+    __m128i mm6 = mm64_0008;
+    mm2 = _mm_unpackhi_epi8(mm2, mm2); // mm2 = v4__v3__v2__v1__
+
+    __m128i mm5 = mm6;
+    mm0 = _mm_unpacklo_epi8(mm0, zero); // mm0 = __p1__p1__p1__p1
+    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[0]); // mm0 *= mm64_coefs[0]
+
+    __m128i mm1 = _mm_unpacklo_epi8(mm2, mm2); // mm1 = v2v2v2v2v1v1v1v1
+    mm2 = _mm_unpackhi_epi8(mm2, mm2); // mm2 = v4v4v4v4v3v3v3v3
+
+    __m128i mm3 = _mm_unpacklo_epi8(mm1, zero); // mm3 = __v1__v1__v1__v1
+    mm1 = _mm_unpackhi_epi8(mm1, zero); // mm1 = __v2__v2__v2__v2
+    mm6 = _mm_add_epi16(mm6, mm0); // mm6 += mm0
+
+    mm0 = mm3;
+    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[1]); // mm0 *= mm64_coefs[1]
+    __m128i mm4 = mm1;
+    mm1 = _mm_mullo_epi16(mm1, mm64_coefs[2]); // mm1 *= mm64_coefs[2]
+
+    mm3 = _mm_mullo_epi16(mm3, mm64_coefs[4]); // mm3 *= mm64_coefs[4]
+    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[3]); // mm4 *= mm64_coefs[3]
+    mm5 = _mm_add_epi16(mm5, mm0); // mm5 += mm0
+
+    mm6 = _mm_add_epi16(mm6, mm1); // mm6 += mm1
+    mm2 = _mm_unpackhi_epi8(mm2, zero); // mm2 = __v4__v4__v4__v4
+    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
+
+    mm1 = _mm_unpacklo_epi8(mm2, zero); // mm1 = __v3__v3__v3__v3
+    mm6 = _mm_add_epi16(mm6, mm3); // mm6 += mm3
+
+    mm0 = mm1;
+    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[6]); // mm0 *= mm64_coefs[6]
+    mm4 = mm2;
+    mm2 = _mm_mullo_epi16(mm2, mm64_coefs[8]); // mm2 *= mm64_coefs[8]
+    mm6 = _mm_add_epi16(mm6, mm0); // mm6 += mm0
+
+    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[7]); // mm4 *= mm64_coefs[7]
+    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
+
+    mm1 = _mm_load_si128((__m128i*) & v[y * stride + 5]); // mm1 = xxxxxxxxv8v7v6v5
+    mm1 = _mm_unpacklo_epi8(mm1, mm1); // mm1 = v8v8v7v7v6v6v5v5
+    mm6 = _mm_add_epi16(mm6, mm2); // mm6 += mm2
+
+    mm2 = mm1;
+    mm2 = _mm_unpacklo_epi8(mm2, zero); // mm2 = __v5__v5__v5__v5
+    mm1 = _mm_unpackhi_epi8(mm1, zero); // mm1 = __v6__v6__v6__v6
+    mm5 = _mm_add_epi16(mm5, mm2); // mm5 += mm2
+
+    mm0 = mm1;
+    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[9]); // mm0 *= mm64_coefs[9]
+    mm4 = mm1;
+    mm1 = _mm_mullo_epi16(mm1, mm64_coefs[10]); // mm1 *= mm64_coefs[10]
+
+    mm2 = _mm_mullo_epi16(mm2, mm64_coefs[12]); // mm2 *= mm64_coefs[12]
+    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[11]); // mm4 *= mm64_coefs[11]
+    mm5 = _mm_add_epi16(mm5, mm0); // mm5 += mm0
+
+    mm6 = _mm_add_epi16(mm6, mm1); // mm6 += mm1
+    mm2 = _mm_unpackhi_epi8(mm2, zero); // mm2 = __v8__v8__v8__v8
+    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
+
+    mm1 = _mm_unpacklo_epi8(mm2, zero); // mm1 = __v7__v7__v7__v7
+    mm6 = _mm_add_epi16(mm6, mm2); // mm6 += mm2
+
+    mm0 = mm1;
+    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[13]); // mm0 *= mm64_coefs[13]
+    mm4 = mm2;
+    mm1 = _mm_mullo_epi16(mm1, mm64_coefs[14]); // mm1 *= mm64_coefs[14]
+
+    mm2 = _mm_mullo_epi16(mm2, mm64_coefs[16]); // mm2 *= mm64_coefs[16]
+    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[15]); // mm4 *= mm64_coefs[15]
+    mm5 = _mm_add_epi16(mm5, mm0); // mm5 += mm0
+
+    mm6 = _mm_add_epi16(mm6, mm1); // mm6 += mm1
+    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
+
+    mm6 = _mm_srli_epi16(mm6, 4); // mm6 /= 16
+    mm5 = _mm_add_epi16(mm5, mm2); // mm5 += mm2
+
+    mm5 = _mm_srli_epi16(mm5, 4); // mm5 /= 16
+    mm6 = _mm_packus_epi16(mm6, mm5); // pack result into mm6
+
+    _mm_store_si128((__m128i*) & v[y * stride + 4], mm6); // v[] = mm6
+  }
+}
+#else
+/* The 9-tap low pass filter used in "DC" regions */
+/* I'm not sure that I like this implementation any more...! */
 void deblock_horiz_lpf9(uint8_t *v, int stride, int QP) 
 {
-	int y, p1, p2;
+  int y, p1, p2;
 	uint64_t *pmm1;  // NOTE THIS HAD BEEN A GLOBAL !!!
 
 	#ifdef PP_SELF_CHECK
@@ -754,18 +872,70 @@ void deblock_horiz_lpf9(uint8_t *v, int stride, int QP)
 	}
 	__asm emms
 }
+#endif
 
+#define ABS_MACRO(X)  (((X)>0)?(X) : 0-(X))
 
+// PF converted to C from self check
+/* decide DC mode or default mode for the horizontal filter */
+int deblock_horiz_useDC_c(uint8_t* v, int stride, int moderate_h)
+{
+  int useDC;
+
+	int eq_cnt2, j, k;
+
+  eq_cnt2 = 0;
+  for (k = 0; k < 4; k++)
+  {
+    for (j = 1; j <= 7; j++)
+    {
+      if (ABS_MACRO(v[j + k * stride] - v[1 + j + k * stride]) <= 1) eq_cnt2++;
+    }
+  }
+
+  useDC = eq_cnt2 >= moderate_h;
+
+  return useDC;
+}
+
+#ifdef USE_NEW_INTRINSICS
+// written based on C (sse4.2)
+int deblock_horiz_useDC(uint8_t* v, int stride, int moderate_h) {
+  int useDC;
+  int eq_cnt2 = 0;
+
+  __m128i one = _mm_set1_epi8(1);
+  __m128i zero = _mm_setzero_si128();
+
+  for (int k = 0; k < 4; k++) {
+    for (int j = 1; j <= 7; j++) {
+      __m128i current = _mm_loadu_si128((__m128i*) & v[j + k * stride]);
+      __m128i next = _mm_loadu_si128((__m128i*) & v[1 + j + k * stride]);
+
+      __m128i diff = _mm_subs_epu8(current, next);
+      __m128i abs_diff = _mm_max_epu8(diff, _mm_subs_epu8(zero, diff));
+
+      __m128i cmp = _mm_cmpeq_epi8(_mm_min_epu8(abs_diff, one), abs_diff);
+      eq_cnt2 += _mm_popcnt_u32(_mm_movemask_epi8(cmp));
+    }
+  }
+
+  useDC = eq_cnt2 >= moderate_h;
+
+  return useDC;
+}
+#else
+// FIXME PF converted to intrinsics
 /* decide DC mode or default mode for the horizontal filter */
 int deblock_horiz_useDC(uint8_t *v, int stride, int moderate_h) 
 {
-	const uint64_t mm64_mask   = 0x00fefefefefefefe;
-	uint32_t mm32_result;
-	uint64_t *pmm1;
-	int eq_cnt, useDC;
-	
-	#ifdef PP_SELF_CHECK
-	int eq_cnt2, j, k;
+  const uint64_t mm64_mask   = 0x00fefefefefefefe;
+  uint32_t mm32_result;
+  uint64_t *pmm1;
+  int eq_cnt, useDC;
+  
+  #ifdef PP_SELF_CHECK
+  int eq_cnt2, j, k;
 	#endif
 
 	pmm1 = (uint64_t *)(&(v[1])); /* this is a 32-bit aligned pointer, not 64-aligned */
@@ -894,10 +1064,159 @@ int deblock_horiz_useDC(uint8_t *v, int stride, int moderate_h)
 }
 
 
+#endif
 ///////////////////////////////////////////////////////////////////////////////////////
 //////////                        DEBLOCK VERTICAL FILTER CODE
 ///////////////////////////////////////////////////////////////////////////////////////
 
+#ifdef USE_NEW_INTRINSICS
+// converted by PF to intrinsics
+void deblock_vert_default_filter(uint8_t* v, int stride, int QP) {
+
+  __m128i mm_0020 = _mm_set1_epi16(0x0020);
+  __m128i mm_8_x_QP = _mm_set1_epi16(0x0008 * QP);
+  __m128i mm7 = _mm_setzero_si128();
+  __m128i mm6, mm1;
+  __m128i mm0, mm2, mm3, mm4, mm5;
+  int i;
+
+  /* working in 4-pixel wide columns, left to right */
+  /*i=0 in left, i=1 in right */
+  for (i = 0; i < 2; i++) {
+    /* v should be 64-bit aligned here */
+    uint8_t* pmm1 = &(v[4 * i]);
+    /* pmm1 will be 32-bit aligned but this doesn't matter as we'll use movd not movq */
+
+    pmm1 += stride;
+    mm0 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm0 = _mm_unpacklo_epi8(mm0, mm7);
+
+    pmm1 += stride;
+    mm1 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm1 = _mm_unpacklo_epi8(mm1, mm7);
+
+    pmm1 += stride;
+    mm2 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm2 = _mm_unpacklo_epi8(mm2, mm7);
+
+    pmm1 += stride;
+    mm3 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm3 = _mm_unpacklo_epi8(mm3, mm7);
+
+    mm1 = _mm_sub_epi16(mm1, mm2);
+    mm4 = mm1;
+    mm1 = _mm_slli_epi16(mm1, 2);
+    mm1 = _mm_add_epi16(mm1, mm4);
+    mm0 = _mm_sub_epi16(mm0, mm3);
+    mm0 = _mm_slli_epi16(mm0, 1);
+    mm0 = _mm_sub_epi16(mm0, mm1);
+
+    mm1 = _mm_setzero_si128();
+    mm1 = _mm_cmpgt_epi16(mm1, mm0);
+    mm0 = _mm_xor_si128(mm0, mm1);
+    mm0 = _mm_sub_epi16(mm0, mm1);
+
+    pmm1 += stride;
+    mm1 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm1 = _mm_unpacklo_epi8(mm1, mm7);
+
+    mm3 = _mm_sub_epi16(mm3, mm1);
+
+    pmm1 += stride;
+    mm4 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm4 = _mm_unpacklo_epi8(mm4, mm7);
+
+    pmm1 += stride;
+    mm5 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm5 = _mm_unpacklo_epi8(mm5, mm7);
+
+    mm2 = _mm_sub_epi16(mm2, mm4);
+    mm5 = _mm_sub_epi16(mm5, mm4);
+    mm4 = mm5;
+    mm4 = _mm_slli_epi16(mm4, 2);
+    mm5 = _mm_add_epi16(mm5, mm4);
+
+    pmm1 += stride;
+    mm4 = _mm_cvtsi32_si128(*(int*)pmm1);
+    mm4 = _mm_unpacklo_epi8(mm4, mm7);
+
+    mm1 = _mm_sub_epi16(mm1, mm4);
+    mm1 = _mm_slli_epi16(mm1, 1);
+    mm1 = _mm_add_epi16(mm1, mm5);
+
+    mm4 = _mm_setzero_si128();
+    mm4 = _mm_cmpgt_epi16(mm4, mm1);
+    mm1 = _mm_xor_si128(mm1, mm4);
+    mm1 = _mm_sub_epi16(mm1, mm4);
+    /* at this point, mm0 = ABS(a3_1), mm1 = ABS(a3_2), mm2 = v3 - v6, mm3 = v4 - v5 */
+    mm4 = mm1;
+    mm1 = _mm_cmpgt_epi16(mm1, mm0);
+    mm0 = _mm_and_si128(mm0, mm1);
+    mm1 = _mm_andnot_si128(mm1, mm4);
+    mm0 = _mm_or_si128(mm0, mm1);
+    /* at this point, mm0 = MIN( ABS(a3_1), ABS(a3_2), mm2 = v3 - v6, mm3 = v4 - v5 */
+    mm1 = mm3;
+    mm3 = _mm_slli_epi16(mm3, 2);
+    mm3 = _mm_add_epi16(mm3, mm1);
+    mm2 = _mm_slli_epi16(mm2, 1);
+    mm2 = _mm_sub_epi16(mm2, mm3);
+    /* at this point, mm0 = MIN( ABS(a3_1), ABS(a3_2), mm1 = v4 - v5, mm2 = a3_0 */
+    mm4 = mm2;
+    mm3 = _mm_setzero_si128();
+    mm3 = _mm_cmpgt_epi16(mm3, mm2);
+    mm4 = _mm_xor_si128(mm4, mm3);
+    mm4 = _mm_sub_epi16(mm4, mm3);
+    /* compare a3_0 against 8*QP */
+    mm2 = mm_8_x_QP;
+    mm2 = _mm_cmpgt_epi16(mm2, mm4);
+    mm2 = _mm_and_si128(mm2, mm4);
+
+    mm4 = mm2;
+    /* at this point, mm0 = MIN( ABS(a3_1), ABS(a3_2), mm1 = v4 - v5, mm2 = a3_0 , mm3 = SGN(a3_0), mm4 = ABS(a3_0) */
+    mm4 = _mm_subs_epu16(mm4, mm0);
+    mm0 = mm4;
+    mm0 = _mm_slli_epi16(mm0, 2);
+    mm0 = _mm_add_epi16(mm0, mm4);
+    mm0 = _mm_add_epi16(mm0, mm_0020);
+    mm0 = _mm_srai_epi16(mm0, 6);
+    /* at this point, mm0 = ABS(d), mm1 = v4 - v5, mm3 = SGN(a3_0) */
+    mm2 = _mm_setzero_si128();
+    mm2 = _mm_cmpgt_epi16(mm2, mm1);
+    mm1 = _mm_xor_si128(mm1, mm2);
+    mm1 = _mm_sub_epi16(mm1, mm2);
+    mm1 = _mm_srai_epi16(mm1, 1);
+    /* OK at this point, mm0 = ABS(d), mm1 = ABS(q), mm2 = SGN(q), mm3 = SGN(-d) */
+    mm4 = mm2;
+    mm4 = _mm_xor_si128(mm4, mm3);
+    mm5 = mm0;
+    mm5 = _mm_cmpgt_epi16(mm5, mm1);
+    mm1 = _mm_and_si128(mm1, mm5);
+    mm5 = _mm_andnot_si128(mm5, mm0);
+    mm1 = _mm_or_si128(mm1, mm5);
+    mm1 = _mm_and_si128(mm1, mm4);
+    mm1 = _mm_xor_si128(mm1, mm2);
+    mm1 = _mm_sub_epi16(mm1, mm2);
+    /* at this point we have d in mm1 */
+    if (i == 0) {
+      mm6 = mm1;
+    }
+  }
+  /* add d to rows l4 and l5 in memory... */
+  uint8_t* pmm1 = &(v[4 * stride]);
+  mm6 = _mm_packs_epi16(mm6, mm1);
+  // Shuffle the packed result to place the second argument's packed values in the correct position
+  // since the original MMX case packed the second argument's 0-63 into the target's 32-63 bits
+  mm6 = _mm_shuffle_epi32(mm6, _MM_SHUFFLE(3, 1, 2, 0));
+  mm0 = _mm_loadl_epi64((__m128i*)pmm1);
+  mm0 = _mm_sub_epi8(mm0, mm6);
+  _mm_storel_epi64((__m128i*)pmm1, mm0);
+
+  pmm1 += stride;
+  mm6 = _mm_add_epi8(mm6, _mm_loadl_epi64((__m128i*)pmm1));
+  _mm_storel_epi64((__m128i*)pmm1, mm6);
+
+}
+#else
 /* Vertical deblocking filter for use in non-flat picture regions */
 void deblock_vert_default_filter(uint8_t *v, int stride, int QP) 
 {
@@ -1122,222 +1441,421 @@ void deblock_vert_default_filter(uint8_t *v, int stride, int QP)
 	
 	__asm  emms   
 }
+#endif
+
 
 ///////////////////////////////////////////////////////// NEW VERTICAL  IS BELOW ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+/* This function chooses the "endstops" for the vertical LPF9 filter: p1 and p2 */
+/* We also convert these to 16-bit values here */
+void deblock_vert_choose_p1p2_c(uint8_t* v, int stride, uint64_t* p1p2, int QP)
+{
+  int i;
+
+  /* check p1 and p2 have been calculated correctly */
+  /* p2 */
+  for (i = 0; i < 8; i++)
+  {
+    ((uint16_t*)(&(p1p2[2])))[i] = ((ABS(v[9 * stride + i] - v[8 * stride + i]) - QP > 0) ? v[8 * stride + i] : v[9 * stride + i]);
+    /*if (((ABS(v[9 * stride + i] - v[8 * stride + i]) - QP > 0) ? v[8 * stride + i] : v[9 * stride + i])
+      != ((uint16_t*)(&(p1p2[2])))[i])
+    {
+      dprintf("ERROR: problem with P2\n");
+    }
+    */
+  }
+
+  /* p1 */
+  for (i = 0; i < 8; i++)
+  {
+    ((uint16_t*)(&(p1p2[0])))[i] = ((ABS(v[0 * stride + i] - v[1 * stride + i]) - QP > 0) ? v[1 * stride + i] : v[0 * stride + i]);
+    /*
+    if (((ABS(v[0 * stride + i] - v[1 * stride + i]) - QP > 0) ? v[1 * stride + i] : v[0 * stride + i])
+      != ((uint16_t*)(&(p1p2[0])))[i])
+    {
+      dprintf("ERROR: problem with P1\n");
+    }
+    */
+  }
+
+}
+
+#ifdef USE_NEW_INTRINSICS
+// converted to intrinsics by PF
+/* This function chooses the "endstops" for the vertical LPF9 filter: p1 and p2 */
+/* We also convert these to 16-bit values here */
+void deblock_vert_choose_p1p2(uint8_t* v, int stride, uint64_t* p1p2, int QP) {
+  __m128i mm_b_qp = _mm_set1_epi8(QP);
+
+#ifdef PP_SELF_CHECK
+  int i;
+#endif
+
+  uint8_t* pmm1 = &(v[0 * stride]);
+  uint8_t* pmm2 = &(v[8 * stride]);
+
+  // p1
+  __m128i mm7 = _mm_setzero_si128(); // mm7 = 0
+  __m128i mm0 = _mm_loadl_epi64((__m128i*)pmm1); // mm0 = *pmm1 = v[l0]
+  __m128i mm2 = mm0; // mm2 = mm0 = v[l0]
+  pmm1 += stride;
+  __m128i mm1 = _mm_loadl_epi64((__m128i*)pmm1); // mm1 = *pmm1 = v[l1]
+  __m128i mm3 = mm1; // mm3 = mm1 = v[l1]
+  mm0 = _mm_subs_epu8(mm0, mm1); // mm0 -= mm1
+  mm1 = _mm_subs_epu8(mm1, mm2); // mm1 -= mm2
+  mm0 = _mm_or_si128(mm0, mm1); // mm0 |= mm1
+  mm0 = _mm_subs_epu8(mm0, mm_b_qp); // mm0 -= QP
+
+  // now a zero byte in mm0 indicates use v0 else use v1
+  mm0 = _mm_cmpeq_epi8(mm0, mm7); // zero bytes to ff others to 00
+  mm1 = mm0; // make a copy of mm0
+
+  // now ff byte in mm0 indicates use v0 else use v1
+  mm0 = _mm_andnot_si128(mm0, mm3); // mask v1 into 00 bytes in mm0
+  mm1 = _mm_and_si128(mm1, mm2); // mask v0 into ff bytes in mm0
+  mm0 = _mm_or_si128(mm0, mm1); // mm0 |= mm1
+  mm1 = mm0; // make a copy of mm0
+
+  // Now we have our result, p1, in mm0. Next, unpack.
+  mm0 = _mm_unpacklo_epi8(mm0, mm7); // low bytes to mm0
+  mm1 = _mm_unpackhi_epi8(mm1, mm7); // high bytes to mm1
+
+  // Store p1 in memory
+  _mm_store_si128((__m128i*) & p1p2[0], mm0); // low words to p1p2[0]
+  _mm_store_si128((__m128i*) & p1p2[1], mm1); // high words to p1p2[1]
+
+  // p2
+  mm1 = _mm_loadl_epi64((__m128i*)pmm2); // mm1 = *pmm2 = v[l8]
+  mm3 = mm1; // mm3 = mm1 = v[l8]
+  pmm2 += stride;
+  mm0 = _mm_loadl_epi64((__m128i*)pmm2); // mm0 = *pmm2 = v[l9]
+  mm2 = mm0; // mm2 = mm0 = v[l9]
+  mm0 = _mm_subs_epu8(mm0, mm1); // mm0 -= mm1
+  mm1 = _mm_subs_epu8(mm1, mm2); // mm1 -= mm2
+  mm0 = _mm_or_si128(mm0, mm1); // mm0 |= mm1
+  mm0 = _mm_subs_epu8(mm0, mm_b_qp); // mm0 -= QP
+
+  // now a zero byte in mm0 indicates use v0 else use v1
+  mm0 = _mm_cmpeq_epi8(mm0, mm7); // zero bytes to ff others to 00
+  mm1 = mm0; // make a copy of mm0
+
+  // now ff byte in mm0 indicates use v0 else use v1
+  mm0 = _mm_andnot_si128(mm0, mm3); // mask v1 into 00 bytes in mm0
+  mm1 = _mm_and_si128(mm1, mm2); // mask v0 into ff bytes in mm0
+  mm0 = _mm_or_si128(mm0, mm1); // mm0 |= mm1
+  mm1 = mm0; // make a copy of mm0
+
+  // Now we have our result, p2, in mm0. Next, unpack.
+  mm0 = _mm_unpacklo_epi8(mm0, mm7); // low bytes to mm0
+  mm1 = _mm_unpackhi_epi8(mm1, mm7); // high bytes to mm1
+
+  // Store p2 in memory
+  _mm_store_si128((__m128i*) & p1p2[2], mm0); // low words to p1p2[2]
+  _mm_store_si128((__m128i*) & p1p2[3], mm1); // high words to p1p2[3]
+
+#ifdef PP_SELF_CHECK
+  /* check p1 and p2 have been calculated correctly */
+  /* p2 */
+  for (i = 0; i < 8; i++) {
+    if (((abs(v[9 * stride + i] - v[8 * stride + i]) - QP > 0) ? v[8 * stride + i] : v[9 * stride + i])
+      != ((uint16_t*)(&(p1p2[2])))[i]) {
+      dprintf("ERROR: problem with P2\n");
+    }
+  }
+
+  /* p1 */
+  for (i = 0; i < 8; i++) {
+    if (((abs(v[0 * stride + i] - v[1 * stride + i]) - QP > 0) ? v[1 * stride + i] : v[0 * stride + i])
+      != ((uint16_t*)(&(p1p2[0])))[i]) {
+      dprintf("ERROR: problem with P1\n");
+    }
+  }
+#endif
+}
+
+#else
 /* This function chooses the "endstops" for the vertical LPF9 filter: p1 and p2 */
 /* We also convert these to 16-bit values here */
 void deblock_vert_choose_p1p2(uint8_t *v, int stride, uint64_t *p1p2, int QP) 
 {
-	uint64_t *pmm1, *pmm2;
-	uint64_t mm_b_qp;
+  uint64_t *pmm1, *pmm2;
+  uint64_t mm_b_qp;
 
-	#ifdef PP_SELF_CHECK
-	int i;
-	#endif
+  #ifdef PP_SELF_CHECK
+  int i;
+  #endif
 
-	/* load QP into every one of the 8 bytes in mm_b_qp */
-	((uint32_t *)&mm_b_qp)[0] = 
-	((uint32_t *)&mm_b_qp)[1] = 0x01010101 * QP; 
+  /* load QP into every one of the 8 bytes in mm_b_qp */
+  ((uint32_t *)&mm_b_qp)[0] = 
+  ((uint32_t *)&mm_b_qp)[1] = 0x01010101 * QP; 
 
-	pmm1 = (uint64_t *)(&(v[0*stride]));
-	pmm2 = (uint64_t *)(&(v[8*stride]));
+  pmm1 = (uint64_t *)(&(v[0*stride]));
+  pmm2 = (uint64_t *)(&(v[8*stride]));
 
-	__asm 
-	{
-		push eax
-		push ebx
-		push ecx
-		
-		mov eax, pmm1
-		mov ebx, pmm2
-		mov ecx, p1p2
+  __asm 
+  {
+    push eax
+    push ebx
+    push ecx
+    
+    mov eax, pmm1
+    mov ebx, pmm2
+    mov ecx, p1p2
 
-		/* p1 */
-		pxor     mm7, mm7             /* mm7 = 0                       */
-		movq     mm0, [eax]           /* mm0 = *pmm1 = v[l0]           */
-		movq     mm2, mm0             /* mm2 = mm0 = v[l0]             */
-		add      eax, stride          /* pmm1 += stride                */
-		movq     mm1, [eax]           /* mm1 = *pmm1 = v[l1]           */
-		movq     mm3, mm1             /* mm3 = mm1 = v[l1]             */
-		psubusb  mm0, mm1             /* mm0 -= mm1                    */
-		psubusb  mm1, mm2             /* mm1 -= mm2                    */
-		por      mm0, mm1             /* mm0 |= mm1                    */
-		psubusb  mm0, mm_b_qp         /* mm0 -= QP                     */
-		
-		/* now a zero byte in mm0 indicates use v0 else use v1         */
-		pcmpeqb  mm0, mm7             /* zero bytes to ff others to 00 */
-		movq     mm1, mm0             /* make a copy of mm0            */
-		
-		/* now ff byte in mm0 indicates use v0 else use v1             */
-		pandn    mm0, mm3             /* mask v1 into 00 bytes in mm0  */
-		pand     mm1, mm2             /* mask v0 into ff bytes in mm0  */
-		por      mm0, mm1             /* mm0 |= mm1                    */
-		movq     mm1, mm0             /* make a copy of mm0            */
-		
-		/* Now we have our result, p1, in mm0.  Next, unpack.          */
-		punpcklbw mm0, mm7            /* low bytes to mm0              */
-		punpckhbw mm1, mm7            /* high bytes to mm1             */
-		
-		/* Store p1 in memory                                          */
-		movq     [ecx], mm0           /* low words to p1p2[0]          */
-		movq     8[ecx], mm1          /* high words to p1p2[1]         */
-		
-		/* p2 */
-		movq     mm1, [ebx]           /* mm1 = *pmm2 = v[l8]           */
-		movq     mm3, mm1             /* mm3 = mm1 = v[l8]             */
-		add      ebx, stride          /* pmm2 += stride                */
-		movq     mm0, [ebx]           /* mm0 = *pmm2 = v[l9]           */
-		movq     mm2, mm0             /* mm2 = mm0 = v[l9]             */
-		psubusb  mm0, mm1             /* mm0 -= mm1                    */
-		psubusb  mm1, mm2             /* mm1 -= mm2                    */
-		por      mm0, mm1             /* mm0 |= mm1                    */
-		psubusb  mm0, mm_b_qp         /* mm0 -= QP                     */
-		
-		/* now a zero byte in mm0 indicates use v0 else use v1              */
-		pcmpeqb  mm0, mm7             /* zero bytes to ff others to 00 */
-		movq     mm1, mm0             /* make a copy of mm0            */
-		
-		/* now ff byte in mm0 indicates use v0 else use v1                  */
-		pandn    mm0, mm3             /* mask v1 into 00 bytes in mm0  */
-		pand     mm1, mm2             /* mask v0 into ff bytes in mm0  */
-		por      mm0, mm1             /* mm0 |= mm1                    */
-		movq     mm1, mm0             /* make a copy of mm0            */
-		
-		/* Now we have our result, p2, in mm0.  Next, unpack.               */
-		punpcklbw mm0, mm7            /* low bytes to mm0              */
-		punpckhbw mm1, mm7            /* high bytes to mm1             */
-		
-		/* Store p2 in memory                                               */
-		movq     16[ecx], mm0         /* low words to p1p2[2]          */
-		movq     24[ecx], mm1         /* high words to p1p2[3]         */
+    /* p1 */
+    pxor     mm7, mm7             /* mm7 = 0                       */
+    movq     mm0, [eax]           /* mm0 = *pmm1 = v[l0]           */
+    movq     mm2, mm0             /* mm2 = mm0 = v[l0]             */
+    add      eax, stride          /* pmm1 += stride                */
+    movq     mm1, [eax]           /* mm1 = *pmm1 = v[l1]           */
+    movq     mm3, mm1             /* mm3 = mm1 = v[l1]             */
+    psubusb  mm0, mm1             /* mm0 -= mm1                    */
+    psubusb  mm1, mm2             /* mm1 -= mm2                    */
+    por      mm0, mm1             /* mm0 |= mm1                    */
+    psubusb  mm0, mm_b_qp         /* mm0 -= QP                     */
+    
+    /* now a zero byte in mm0 indicates use v0 else use v1         */
+    pcmpeqb  mm0, mm7             /* zero bytes to ff others to 00 */
+    movq     mm1, mm0             /* make a copy of mm0            */
+    
+    /* now ff byte in mm0 indicates use v0 else use v1             */
+    pandn    mm0, mm3             /* mask v1 into 00 bytes in mm0  */
+    pand     mm1, mm2             /* mask v0 into ff bytes in mm0  */
+    por      mm0, mm1             /* mm0 |= mm1                    */
+    movq     mm1, mm0             /* make a copy of mm0            */
+    
+    /* Now we have our result, p1, in mm0.  Next, unpack.          */
+    punpcklbw mm0, mm7            /* low bytes to mm0              */
+    punpckhbw mm1, mm7            /* high bytes to mm1             */
+    
+    /* Store p1 in memory                                          */
+    movq     [ecx], mm0           /* low words to p1p2[0]          */
+    movq     8[ecx], mm1          /* high words to p1p2[1]         */
+    
+    /* p2 */
+    movq     mm1, [ebx]           /* mm1 = *pmm2 = v[l8]           */
+    movq     mm3, mm1             /* mm3 = mm1 = v[l8]             */
+    add      ebx, stride          /* pmm2 += stride                */
+    movq     mm0, [ebx]           /* mm0 = *pmm2 = v[l9]           */
+    movq     mm2, mm0             /* mm2 = mm0 = v[l9]             */
+    psubusb  mm0, mm1             /* mm0 -= mm1                    */
+    psubusb  mm1, mm2             /* mm1 -= mm2                    */
+    por      mm0, mm1             /* mm0 |= mm1                    */
+    psubusb  mm0, mm_b_qp         /* mm0 -= QP                     */
+    
+    /* now a zero byte in mm0 indicates use v0 else use v1              */
+    pcmpeqb  mm0, mm7             /* zero bytes to ff others to 00 */
+    movq     mm1, mm0             /* make a copy of mm0            */
+    
+    /* now ff byte in mm0 indicates use v0 else use v1                  */
+    pandn    mm0, mm3             /* mask v1 into 00 bytes in mm0  */
+    pand     mm1, mm2             /* mask v0 into ff bytes in mm0  */
+    por      mm0, mm1             /* mm0 |= mm1                    */
+    movq     mm1, mm0             /* make a copy of mm0            */
+    
+    /* Now we have our result, p2, in mm0.  Next, unpack.               */
+    punpcklbw mm0, mm7            /* low bytes to mm0              */
+    punpckhbw mm1, mm7            /* high bytes to mm1             */
+    
+    /* Store p2 in memory                                               */
+    movq     16[ecx], mm0         /* low words to p1p2[2]          */
+    movq     24[ecx], mm1         /* high words to p1p2[3]         */
 
-		pop ecx
-		pop ebx
-		pop eax
-	};
+    pop ecx
+    pop ebx
+    pop eax
+  };
 
-	#ifdef PP_SELF_CHECK
-	/* check p1 and p2 have been calculated correctly */
-	/* p2 */
-	for (i=0; i<8; i++) 
-	{
-		if ( ((ABS(v[9*stride+i] - v[8*stride+i]) - QP > 0) ? v[8*stride+i] : v[9*stride+i])
-			 != ((uint16_t *)(&(p1p2[2])))[i] ) 
-		{
-			 dprintf("ERROR: problem with P2\n");
-		}
-	}
-	
-	/* p1 */
-	for (i=0; i<8; i++) 
-	{
-		if ( ((ABS(v[0*stride+i] - v[1*stride+i]) - QP > 0) ? v[1*stride+i] : v[0*stride+i])
-			 != ((uint16_t *)(&(p1p2[0])))[i] ) 
-		{
-			 dprintf("ERROR: problem with P1\n");
-		}
-	}
-	#endif
+  #ifdef PP_SELF_CHECK
+  /* check p1 and p2 have been calculated correctly */
+  /* p2 */
+  for (i=0; i<8; i++) 
+  {
+    if ( ((ABS(v[9*stride+i] - v[8*stride+i]) - QP > 0) ? v[8*stride+i] : v[9*stride+i])
+       != ((uint16_t *)(&(p1p2[2])))[i] ) 
+    {
+       dprintf("ERROR: problem with P2\n");
+    }
+  }
+  
+  /* p1 */
+  for (i=0; i<8; i++) 
+  {
+    if ( ((ABS(v[0*stride+i] - v[1*stride+i]) - QP > 0) ? v[1*stride+i] : v[0*stride+i])
+       != ((uint16_t *)(&(p1p2[0])))[i] ) 
+    {
+       dprintf("ERROR: problem with P1\n");
+    }
+  }
+  #endif
 
-	__asm emms;
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
+
+}
+#endif
+
+// like the checker code below
+void deblock_vert_copy_and_unpack_c(int stride, uint8_t* source, uint64_t* dest, int n) {
+  int j, k;
+  uint64_t* pmm1 = (uint64_t*)source;
+  uint64_t* pmm2 = (uint64_t*)dest;
+  int i = -n / 2;
+  for (k = 0; k < n; k++)
+  {
+    for (j = 0; j < 8; j++)
+    {
+      ((uint16_t*)dest)[k * 8 + j] = source[k * stride + j];
+    }
+  }
 
 }
 
+#ifdef USE_NEW_INTRINSICS
+/* function using MMX to copy an 8-pixel wide column and unpack to 16-bit values */
+/* n is the number of rows to copy - this must be even */
+void deblock_vert_copy_and_unpack(int stride, uint8_t* source, uint64_t* dest, int n)
+{
+  uint64_t* pmm1 = (uint64_t*)source;
+  uint64_t* pmm2 = (uint64_t*)dest;
+  int i = -n / 2;
+
+  for (; i < 0; ++i) {
+    __m128i xmm0 = _mm_loadl_epi64((__m128i*)source); // Load 8 bytes from source
+    source += stride; // Move to the next row
+
+    __m128i xmm1 = _mm_unpacklo_epi8(xmm0, _mm_setzero_si128()); // Unpack low bytes to 16-bit values
+    _mm_store_si128((__m128i*)dest, xmm1); // Store the result in dest
+    dest += 2; // Move to the next 16 bytes in dest
+
+    xmm0 = _mm_loadl_epi64((__m128i*)source); // Load next 8 bytes from source
+    source += stride; // Move to the next row
+
+    xmm1 = _mm_unpacklo_epi8(xmm0, _mm_setzero_si128()); // Unpack low bytes to 16-bit values
+    _mm_store_si128((__m128i*)dest, xmm1); // Store the result in dest
+    dest += 2; // Move to the next 16 bytes in dest
+  }
+#ifdef PP_SELF_CHECK
+  int j, k;
+#endif
+
+#ifdef PP_SELF_CHECK
+  /* check that MMX copy has worked correctly */
+  for (k = 0; k < n; k++)
+  {
+    for (j = 0; j < 8; j++)
+    {
+      if (((uint16_t*)dest)[k * 8 + j] != source[k * stride + j])
+      {
+        dprintf("ERROR: MMX copy block is flawed at (%d, %d)\n", j, k);
+      }
+    }
+  }
+#endif
+
+
+}
+#else
 /* function using MMX to copy an 8-pixel wide column and unpack to 16-bit values */
 /* n is the number of rows to copy - this must be even */
 void deblock_vert_copy_and_unpack(int stride, uint8_t *source, uint64_t *dest, int n) 
 {
-	uint64_t *pmm1 = (uint64_t *)source;
-	uint64_t *pmm2 = (uint64_t *)dest;
-	int i = -n / 2;
+  uint64_t *pmm1 = (uint64_t *)source;
+  uint64_t *pmm2 = (uint64_t *)dest;
+  int i = -n / 2;
 
-	#ifdef PP_SELF_CHECK
-	int j, k;
-	#endif
+  #ifdef PP_SELF_CHECK
+  int j, k;
+  #endif
 
-	/* copy block to local store whilst unpacking to 16-bit values */
-	__asm 
-	{
-		push edi
-		push eax
-		push ebx
-		
-		mov edi, i
-		mov eax, pmm1
-		mov ebx, pmm2
+  /* copy block to local store whilst unpacking to 16-bit values */
+  __asm 
+  {
+    push edi
+    push eax
+    push ebx
+    
+    mov edi, i
+    mov eax, pmm1
+    mov ebx, pmm2
 
-		pxor   mm7, mm7                        /* set mm7 = 0                     */
-	deblock_v_L1:                             /* now p1 is in mm1                */	
-		movq   mm0, [eax]                     /* mm0 = v[0*stride]               */							
+    pxor   mm7, mm7                        /* set mm7 = 0                     */
+  deblock_v_L1:                             /* now p1 is in mm1                */	
+    movq   mm0, [eax]                     /* mm0 = v[0*stride]               */							
 
-		#ifdef PREFETCH_ENABLE
-		prefetcht0 0[ebx]                 
-		#endif
-	
-		add   eax, stride                    /* p_data += stride                */
-		movq   mm1, mm0                        /* mm1 = v[0*stride]               */							
-		punpcklbw mm0, mm7                     /* unpack low bytes (left hand 4)  */
+    #ifdef PREFETCH_ENABLE
+    prefetcht0 0[ebx]                 
+    #endif
+  
+    add   eax, stride                    /* p_data += stride                */
+    movq   mm1, mm0                        /* mm1 = v[0*stride]               */							
+    punpcklbw mm0, mm7                     /* unpack low bytes (left hand 4)  */
 
-		movq   mm2, [eax]                     /* mm2 = v[0*stride]               */							
-		punpckhbw mm1, mm7                     /* unpack high bytes (right hand 4)*/
+    movq   mm2, [eax]                     /* mm2 = v[0*stride]               */							
+    punpckhbw mm1, mm7                     /* unpack high bytes (right hand 4)*/
 
-		movq   mm3, mm2                        /* mm3 = v[0*stride]               */							
-		punpcklbw mm2, mm7                     /* unpack low bytes (left hand 4)  */
+    movq   mm3, mm2                        /* mm3 = v[0*stride]               */							
+    punpcklbw mm2, mm7                     /* unpack low bytes (left hand 4)  */
 
-		movq   [ebx], mm0                     /* v_local[n] = mm0 (left)         */
-		add   eax, stride                    /* p_data += stride                */
+    movq   [ebx], mm0                     /* v_local[n] = mm0 (left)         */
+    add   eax, stride                    /* p_data += stride                */
 
-		movq   8[ebx], mm1                    /* v_local[n+8] = mm1 (right)      */
-		punpckhbw mm3, mm7                     /* unpack high bytes (right hand 4)*/
+    movq   8[ebx], mm1                    /* v_local[n+8] = mm1 (right)      */
+    punpckhbw mm3, mm7                     /* unpack high bytes (right hand 4)*/
 
-		movq   16[ebx], mm2                   /* v_local[n+16] = mm2 (left)      */
+    movq   16[ebx], mm2                   /* v_local[n+16] = mm2 (left)      */
 
-		movq   24[ebx], mm3                   /* v_local[n+24] = mm3 (right)     */
+    movq   24[ebx], mm3                   /* v_local[n+24] = mm3 (right)     */
 
-		add   ebx, 32                        /* p_data2 += 8                    */
-		
-		add   i, 1                            /* increment loop counter          */
-		jne    deblock_v_L1             
+    add   ebx, 32                        /* p_data2 += 8                    */
+    
+    add   i, 1                            /* increment loop counter          */
+    jne    deblock_v_L1             
 
-		pop ebx
-		pop eax
-		pop edi
-	};
+    pop ebx
+    pop eax
+    pop edi
+  };
 
-	#ifdef PP_SELF_CHECK
-	/* check that MMX copy has worked correctly */
-	for (k=0; k<n; k++) 
-	{
-		for (j=0; j<8; j++) 
-		{
-			if ( ((uint16_t *)dest)[k*8+j] != source[k*stride+j] ) 
-			{
-				dprintf("ERROR: MMX copy block is flawed at (%d, %d)\n", j, k);  
-			} 
-		}
-	}
-	#endif
+  #ifdef PP_SELF_CHECK
+  /* check that MMX copy has worked correctly */
+  for (k=0; k<n; k++) 
+  {
+    for (j=0; j<8; j++) 
+    {
+      if ( ((uint16_t *)dest)[k*8+j] != source[k*stride+j] ) 
+      {
+        dprintf("ERROR: MMX copy block is flawed at (%d, %d)\n", j, k);  
+      } 
+    }
+  }
+  #endif
 
-	__asm emms;
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 
 }
+#endif
 
 /* decide whether the DC filter should be turned on according to QP */
-int deblock_vert_DC_on(uint8_t *v, int stride, int QP) 
+int deblock_vert_DC_on(uint8_t* v, int stride, int QP)
 {
-	for (int i=0; i<8; ++i)
+	for (int i = 0; i < 8; ++i)
 	{
-		if (ABS(v[i+0*stride]-v[i+5*stride]) >= 2*QP) return false;
-		if (ABS(v[i+1*stride]-v[i+4*stride]) >= 2*QP) return false;
-		if (ABS(v[i+1*stride]-v[i+8*stride]) >= 2*QP) return false;
-		if (ABS(v[i+2*stride]-v[i+7*stride]) >= 2*QP) return false;
-		if (ABS(v[i+3*stride]-v[i+6*stride]) >= 2*QP) return false;
+		if (ABS(v[i + 0 * stride] - v[i + 5 * stride]) >= 2 * QP) return false;
+		if (ABS(v[i + 1 * stride] - v[i + 4 * stride]) >= 2 * QP) return false;
+		if (ABS(v[i + 1 * stride] - v[i + 8 * stride]) >= 2 * QP) return false;
+		if (ABS(v[i + 2 * stride] - v[i + 7 * stride]) >= 2 * QP) return false;
+		if (ABS(v[i + 3 * stride] - v[i + 6 * stride]) >= 2 * QP) return false;
 	}
 	return true;
 }
 
 #if 0
 // This older method produces artifacts.
+
 int deblock_vert_DC_on(uint8_t *v, int stride, int QP) 
 {
 	uint64_t QP_x_2;
@@ -1403,14 +1921,14 @@ int deblock_vert_DC_on(uint8_t *v, int stride, int QP)
 #endif
 
 /* Vertical deblocking filter for use in non-flat picture regions */
-void deblock_vert_default_filter_ORIGINAL(uint8_t *v, int stride, int QP) 
+// obtained from _ORIGINAL, self_check case
+// plus define SIGN macro
+#define SIGN(X)   (((X)>0)?1:-1)
+
+void deblock_vert_default_filter_c(uint8_t* v, int stride, int QP)
 {
-	uint64_t *pmm1;
-	const uint64_t mm_0020 = 0x0020002000200020;
-	uint64_t mm_8_x_QP;
-	int i;
-	
-	#ifdef PP_SELF_CHECK
+//  int i;
+
 	/* define semi-constants to enable us to move up and down the picture easily... */
 	int l1 = 1 * stride;
 	int l2 = 2 * stride;
@@ -1421,44 +1939,118 @@ void deblock_vert_default_filter_ORIGINAL(uint8_t *v, int stride, int QP)
 	int l7 = 7 * stride;
 	int l8 = 8 * stride;
 	int x, y, a3_0_SC, a3_1_SC, a3_2_SC, d_SC, q_SC;
-	uint8_t selfcheck[8][2];
-	#endif
+//uint8_t selfcheck[8][2];
 
-	#ifdef PP_SELF_CHECK
 	/* compute selfcheck matrix for later comparison */
-	for (x=0; x<8; x++) 
+  for (x = 0; x < 8; x++)
 	{
-		a3_0_SC = 2*v[l3+x] - 5*v[l4+x] + 5*v[l5+x] - 2*v[l6+x];	
-		a3_1_SC = 2*v[l1+x] - 5*v[l2+x] + 5*v[l3+x] - 2*v[l4+x];	
-		a3_2_SC = 2*v[l5+x] - 5*v[l6+x] + 5*v[l7+x] - 2*v[l8+x];	
-		q_SC    = (v[l4+x] - v[l5+x]) / 2;
+    a3_0_SC = 2 * v[l3 + x] - 5 * v[l4 + x] + 5 * v[l5 + x] - 2 * v[l6 + x];
+    a3_1_SC = 2 * v[l1 + x] - 5 * v[l2 + x] + 5 * v[l3 + x] - 2 * v[l4 + x];
+    a3_2_SC = 2 * v[l5 + x] - 5 * v[l6 + x] + 5 * v[l7 + x] - 2 * v[l8 + x];
+    q_SC = (v[l4 + x] - v[l5 + x]) / 2;
 
-		if (ABS(a3_0_SC) < 8*QP) 
+    if (ABS(a3_0_SC) < 8 * QP)
 		{
 
 			d_SC = ABS(a3_0_SC) - MIN(ABS(a3_1_SC), ABS(a3_2_SC));
-			if (d_SC < 0) d_SC=0;
+      if (d_SC < 0) d_SC = 0;
 				
-			d_SC = (5*d_SC + 32) >> 6; 
+      d_SC = (5 * d_SC + 32) >> 6;
 			d_SC *= SIGN(-a3_0_SC);
 							
 			//printf("d_SC[%d] preclip=%d\n", x, d_SC);
 			/* clip d in the range 0 ... q */
 			if (q_SC > 0) 
 			{
-				d_SC = d_SC<0    ? 0    : d_SC;
-				d_SC = d_SC>q_SC ? q_SC : d_SC;
+        d_SC = d_SC < 0 ? 0 : d_SC;
+        d_SC = d_SC > q_SC ? q_SC : d_SC;
 			} 
 			else 
 			{
-				d_SC = d_SC>0    ? 0    : d_SC;
-				d_SC = d_SC<q_SC ? q_SC : d_SC;
+        d_SC = d_SC > 0 ? 0 : d_SC;
+        d_SC = d_SC < q_SC ? q_SC : d_SC;
 			}
 		} 
 		else 
 		{
 			d_SC = 0;		
 		}
+
+    v[l4 + x + 0 * stride] = v[l4 + x] - d_SC;
+    v[l4 + x + 1 * stride] = v[l5 + x] + d_SC;
+    //selfcheck[x][0] = v[l4 + x] - d_SC;
+    //selfcheck[x][1] = v[l5 + x] + d_SC;
+  }
+
+  /* do selfcheck */
+  /*
+  for (x = 0; x < 8; x++)
+  {
+    for (y = 0; y < 2; y++)
+    {
+      v[l4 + x + y * stride] = selfcheck[x][y];
+    }
+  }
+  */
+}
+
+#if 0
+void deblock_vert_default_filter_ORIGINAL(uint8_t *v, int stride, int QP) 
+{
+  uint64_t *pmm1;
+  const uint64_t mm_0020 = 0x0020002000200020;
+  uint64_t mm_8_x_QP;
+  int i;
+  
+  #ifdef PP_SELF_CHECK
+  /* define semi-constants to enable us to move up and down the picture easily... */
+  int l1 = 1 * stride;
+  int l2 = 2 * stride;
+  int l3 = 3 * stride;
+  int l4 = 4 * stride;
+  int l5 = 5 * stride;
+  int l6 = 6 * stride;
+  int l7 = 7 * stride;
+  int l8 = 8 * stride;
+  int x, y, a3_0_SC, a3_1_SC, a3_2_SC, d_SC, q_SC;
+  uint8_t selfcheck[8][2];
+  #endif
+
+  #ifdef PP_SELF_CHECK
+  /* compute selfcheck matrix for later comparison */
+  for (x=0; x<8; x++) 
+  {
+    a3_0_SC = 2*v[l3+x] - 5*v[l4+x] + 5*v[l5+x] - 2*v[l6+x];	
+    a3_1_SC = 2*v[l1+x] - 5*v[l2+x] + 5*v[l3+x] - 2*v[l4+x];	
+    a3_2_SC = 2*v[l5+x] - 5*v[l6+x] + 5*v[l7+x] - 2*v[l8+x];	
+    q_SC    = (v[l4+x] - v[l5+x]) / 2;
+
+    if (ABS(a3_0_SC) < 8*QP) 
+    {
+
+      d_SC = ABS(a3_0_SC) - MIN(ABS(a3_1_SC), ABS(a3_2_SC));
+      if (d_SC < 0) d_SC=0;
+        
+      d_SC = (5*d_SC + 32) >> 6; 
+      d_SC *= SIGN(-a3_0_SC);
+              
+      //printf("d_SC[%d] preclip=%d\n", x, d_SC);
+      /* clip d in the range 0 ... q */
+      if (q_SC > 0) 
+      {
+        d_SC = d_SC<0    ? 0    : d_SC;
+        d_SC = d_SC>q_SC ? q_SC : d_SC;
+      } 
+      else 
+      {
+        d_SC = d_SC>0    ? 0    : d_SC;
+        d_SC = d_SC<q_SC ? q_SC : d_SC;
+      }
+    } 
+    else 
+    {
+      d_SC = 0;		
+    }
 		selfcheck[x][0] = v[l4+x] - d_SC;
 		selfcheck[x][1] = v[l5+x] + d_SC;
 	}
@@ -1677,8 +2269,6 @@ void deblock_vert_default_filter_ORIGINAL(uint8_t *v, int stride, int QP)
 		pop ecx
 	};
 
-	__asm emms;
-
 	#ifdef PP_SELF_CHECK
 	/* do selfcheck */
 	for (x=0; x<8; x++) 
@@ -1695,53 +2285,170 @@ void deblock_vert_default_filter_ORIGINAL(uint8_t *v, int stride, int QP)
 	}
 	#endif
 }
-
+#endif
 // const static uint64_t mm_fours  = 0x0004000400040004;  ORIGINAL CODE
 
+/* Vertical 9-tap low-pass filter for use in "DC" regions of the picture */
+// from PP_SELF_CHECK case
+void deblock_vert_lpf9_c(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
+{
+  int l1 = 1 * stride;
+  int l2 = 2 * stride;
+  int l3 = 3 * stride;
+  int l4 = 4 * stride;
+  int l5 = 5 * stride;
+  int l6 = 6 * stride;
+  int l7 = 7 * stride;
+  int l8 = 8 * stride;
 
+  for (int j = 0; j < 8; j++) {
+    uint8_t* vv = &(v[j]);
+    int p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4];
+    int p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4];
+    int psum = p1 + p1 + p1 + vv[l1] + vv[l2] + vv[l3] + vv[l4] + 4;
+
+    v[l1 + j] = (((psum + vv[l1]) << 1) - (vv[l4] - vv[l5])) >> 4;
+		psum += vv[l5] - p1; 
+    v[l2 + j] = (((psum + vv[l2]) << 1) - (vv[l5] - vv[l6])) >> 4;
+		psum += vv[l6] - p1; 
+    v[l3 + j] = (((psum + vv[l3]) << 1) - (vv[l6] - vv[l7])) >> 4;
+		psum += vv[l7] - p1; 
+    v[l4 + j] = (((psum + vv[l4]) << 1) + p1 - vv[l1] - (vv[l7] - vv[l8])) >> 4;
+		psum += vv[l8] - vv[l1];  
+    v[l5 + j] = (((psum + vv[l5]) << 1) + (vv[l1] - vv[l2]) - vv[l8] + p2) >> 4;
+		psum += p2 - vv[l2];  
+    v[l6 + j] = (((psum + vv[l6]) << 1) + (vv[l2] - vv[l3])) >> 4;
+		psum += p2 - vv[l3]; 
+    v[l7 + j] = (((psum + vv[l7]) << 1) + (vv[l3] - vv[l4])) >> 4;
+		psum += p2 - vv[l4]; 
+    v[l8 + j] = (((psum + vv[l8]) << 1) + (vv[l4] - vv[l5])) >> 4;
+  }
+}
+
+#ifdef USE_NEW_INTRINSICS
+// PF converted to intrinsics
+/* Vertical 9-tap low-pass filter for use in "DC" regions of the picture */
+// SSE2 regenerated from the simplified C version
+void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
+{
+  int l1 = 1 * stride;
+  int l2 = 2 * stride;
+  int l3 = 3 * stride;
+  int l4 = 4 * stride;
+  int l5 = 5 * stride;
+  int l6 = 6 * stride;
+  int l7 = 7 * stride;
+  int l8 = 8 * stride;
+
+  for (int j = 0; j < 8; j++) {
+    uint8_t* vv = &(v[j]);
+    int p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4];
+    int p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4];
+
+    __m128i p1_vec = _mm_set1_epi16(p1);
+    __m128i p2_vec = _mm_set1_epi16(p2);
+    __m128i four = _mm_set1_epi16(4);
+
+    __m128i vv_l1 = _mm_set1_epi16(vv[l1]);
+    __m128i vv_l2 = _mm_set1_epi16(vv[l2]);
+    __m128i vv_l3 = _mm_set1_epi16(vv[l3]);
+    __m128i vv_l4 = _mm_set1_epi16(vv[l4]);
+    __m128i vv_l5 = _mm_set1_epi16(vv[l5]);
+    __m128i vv_l6 = _mm_set1_epi16(vv[l6]);
+    __m128i vv_l7 = _mm_set1_epi16(vv[l7]);
+    __m128i vv_l8 = _mm_set1_epi16(vv[l8]);
+
+    __m128i psum = _mm_add_epi16(_mm_add_epi16(_mm_add_epi16(_mm_add_epi16(_mm_add_epi16(p1_vec, p1_vec), p1_vec), vv_l1), vv_l2), vv_l3);
+    psum = _mm_add_epi16(_mm_add_epi16(psum, vv_l4), four);
+
+    __m128i result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l1), 1);
+    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l4, vv_l5));
+    v[l1 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l5, p1_vec));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l2), 1);
+    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l5, vv_l6));
+    v[l2 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l6, p1_vec));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l3), 1);
+    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l6, vv_l7));
+    v[l3 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l7, p1_vec));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l4), 1);
+    result = _mm_add_epi16(result, p1_vec);
+    result = _mm_sub_epi16(result, vv_l1);
+    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l7, vv_l8));
+    v[l4 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l8, vv_l1));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l5), 1);
+    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l1, vv_l2));
+    result = _mm_sub_epi16(result, vv_l8);
+    result = _mm_add_epi16(result, p2_vec);
+    v[l5 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(p2_vec, vv_l2));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l6), 1);
+    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l2, vv_l3));
+    v[l6 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(p2_vec, vv_l3));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l7), 1);
+    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l3, vv_l4));
+    v[l7 + j] = _mm_extract_epi16(result, 0) >> 4;
+
+    psum = _mm_add_epi16(psum, _mm_sub_epi16(p2_vec, vv_l4));
+    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l8), 1);
+    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l4, vv_l5));
+    v[l8 + j] = _mm_extract_epi16(result, 0) >> 4;
+  }
+}
+#else
 /* Vertical 9-tap low-pass filter for use in "DC" regions of the picture */
 void deblock_vert_lpf9(uint64_t *v_local, uint64_t *p1p2, uint8_t *v, int stride) 
 {
-	#ifdef PP_SELF_CHECK
-	int j, k;
-	uint8_t selfcheck[64], *vv;
-	int p1, p2, psum;
-	/* define semi-constants to enable us to move up and down the picture easily... */
-	int l1 = 1 * stride;
-	int l2 = 2 * stride;
-	int l3 = 3 * stride;
-	int l4 = 4 * stride;
-	int l5 = 5 * stride;
-	int l6 = 6 * stride;
-	int l7 = 7 * stride;
-	int l8 = 8 * stride;
-	#endif
+  #ifdef PP_SELF_CHECK
+  int j, k;
+  uint8_t selfcheck[64], *vv;
+  int p1, p2, psum;
+  /* define semi-constants to enable us to move up and down the picture easily... */
+  int l1 = 1 * stride;
+  int l2 = 2 * stride;
+  int l3 = 3 * stride;
+  int l4 = 4 * stride;
+  int l5 = 5 * stride;
+  int l6 = 6 * stride;
+  int l7 = 7 * stride;
+  int l8 = 8 * stride;
+  #endif
 
 
-	#ifdef PP_SELF_CHECK
-	/* generate a self-check version of the filter result in selfcheck[64] */
-	/* loop left->right */
-	for (j=0; j<8; j++) 
-	{ 
-		vv = &(v[j]);
-		p1 = ((uint16_t *)(&(p1p2[0+j/4])))[j%4]; /* yuck! */
-		p2 = ((uint16_t *)(&(p1p2[2+j/4])))[j%4]; /* yuck! */
-		/* the above may well be endian-fussy */
-		psum = p1 + p1 + p1 + vv[l1] + vv[l2] + vv[l3] + vv[l4] + 4; 
-		selfcheck[j+8*0] = (((psum + vv[l1]) << 1) - (vv[l4] - vv[l5])) >> 4; 
-		psum += vv[l5] - p1; 
-		selfcheck[j+8*1] = (((psum + vv[l2]) << 1) - (vv[l5] - vv[l6])) >> 4; 
-		psum += vv[l6] - p1; 
-		selfcheck[j+8*2] = (((psum + vv[l3]) << 1) - (vv[l6] - vv[l7])) >> 4; 
-		psum += vv[l7] - p1; 
-		selfcheck[j+8*3] = (((psum + vv[l4]) << 1) + p1 - vv[l1] - (vv[l7] - vv[l8])) >> 4; 
-		psum += vv[l8] - vv[l1];  
-		selfcheck[j+8*4] = (((psum + vv[l5]) << 1) + (vv[l1] - vv[l2]) - vv[l8] + p2) >> 4; 
-		psum += p2 - vv[l2];  
-		selfcheck[j+8*5] = (((psum + vv[l6]) << 1) + (vv[l2] - vv[l3])) >> 4; 
-		psum += p2 - vv[l3]; 
-		selfcheck[j+8*6] = (((psum + vv[l7]) << 1) + (vv[l3] - vv[l4])) >> 4; 
-		psum += p2 - vv[l4]; 
+  #ifdef PP_SELF_CHECK
+  /* generate a self-check version of the filter result in selfcheck[64] */
+  /* loop left->right */
+  for (j=0; j<8; j++) 
+  { 
+    vv = &(v[j]);
+    p1 = ((uint16_t *)(&(p1p2[0+j/4])))[j%4]; /* yuck! */
+    p2 = ((uint16_t *)(&(p1p2[2+j/4])))[j%4]; /* yuck! */
+    /* the above may well be endian-fussy */
+    psum = p1 + p1 + p1 + vv[l1] + vv[l2] + vv[l3] + vv[l4] + 4; 
+    selfcheck[j+8*0] = (((psum + vv[l1]) << 1) - (vv[l4] - vv[l5])) >> 4; 
+    psum += vv[l5] - p1; 
+    selfcheck[j+8*1] = (((psum + vv[l2]) << 1) - (vv[l5] - vv[l6])) >> 4; 
+    psum += vv[l6] - p1; 
+    selfcheck[j+8*2] = (((psum + vv[l3]) << 1) - (vv[l6] - vv[l7])) >> 4; 
+    psum += vv[l7] - p1; 
+    selfcheck[j+8*3] = (((psum + vv[l4]) << 1) + p1 - vv[l1] - (vv[l7] - vv[l8])) >> 4; 
+    psum += vv[l8] - vv[l1];  
+    selfcheck[j+8*4] = (((psum + vv[l5]) << 1) + (vv[l1] - vv[l2]) - vv[l8] + p2) >> 4; 
+    psum += p2 - vv[l2];  
+    selfcheck[j+8*5] = (((psum + vv[l6]) << 1) + (vv[l2] - vv[l3])) >> 4; 
+    psum += p2 - vv[l3]; 
+    selfcheck[j+8*6] = (((psum + vv[l7]) << 1) + (vv[l3] - vv[l4])) >> 4; 
+    psum += p2 - vv[l4]; 
 		selfcheck[j+8*7] = (((psum + vv[l8]) << 1) + (vv[l4] - vv[l5])) >> 4; 
 	}
 	#endif
@@ -2104,33 +2811,96 @@ void deblock_vert_lpf9(uint64_t *v_local, uint64_t *p1p2, uint8_t *v, int stride
 		}
 	}
 	#endif
-
-	__asm emms;
-
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 }
+#endif
+
+
 
 /* decide DC mode or default mode in assembler */
-int deblock_vert_useDC(uint8_t *v, int stride, int moderate_v) 
+// C conversion by PF
+int deblock_vert_useDC_c(uint8_t* v, int stride, int moderate_v)
 {
-	const uint64_t mask   = 0xfefefefefefefefe;
-	uint32_t mm_data1;
-	uint64_t *pmm1;
 	int eq_cnt, useDC;
-	#ifdef PP_SELF_CHECK
 	int useDC2, i, j;
-	#endif
 
-	#ifdef PP_SELF_CHECK
 	/* C-code version for testing */
 	eq_cnt = 0;
-	for (j=1; j<8; j++) 
+  for (j = 1; j < 8; j++)
 	{
-		for (i=0; i<8; i++) 
+    for (i = 0; i < 8; i++)
 		{
-			if (ABS(v[j*stride+i] - v[(j+1)*stride+i]) <= 1) eq_cnt++;
+      if (ABS(v[j * stride + i] - v[(j + 1) * stride + i]) <= 1) eq_cnt++;
 		}
 	}
 	useDC2 = (eq_cnt > moderate_v); 
+
+  return useDC2;
+}
+
+// new helper function SSE2 compat
+int my_mm_popcnt_epi8(__m128i x) {
+  // Count the number of set bits in each byte
+  x = _mm_sub_epi8(x, _mm_and_si128(_mm_srli_epi16(x, 1), _mm_set1_epi8(0x55)));
+  x = _mm_add_epi8(_mm_and_si128(x, _mm_set1_epi8(0x33)), _mm_and_si128(_mm_srli_epi16(x, 2), _mm_set1_epi8(0x33)));
+  x = _mm_add_epi8(x, _mm_srli_epi16(x, 4));
+  x = _mm_and_si128(x, _mm_set1_epi8(0x0F));
+
+  // Sum the counts in each byte
+  __m128i sum1 = _mm_sad_epu8(x, _mm_setzero_si128());
+  return _mm_extract_epi16(sum1, 0) + _mm_extract_epi16(sum1, 4);
+}
+
+#ifdef USE_NEW_INTRINSICS
+// PF converted to intrinsics, generated from C original
+int deblock_vert_useDC(uint8_t* v, int stride, int moderate_v) {
+  int eq_cnt = 0;
+
+  __m128i one = _mm_set1_epi8(1);
+
+  for (int j = 1; j < 8; j++) {
+    for (int i = 0; i < 8; i += 16) {
+      __m128i curr_row = _mm_loadu_si128((__m128i*) & v[j * stride + i]);
+      __m128i next_row = _mm_loadu_si128((__m128i*) & v[(j + 1) * stride + i]);
+
+      __m128i diff1 = _mm_subs_epu8(curr_row, next_row);
+      __m128i diff2 = _mm_subs_epu8(next_row, curr_row);
+      __m128i abs_diff = _mm_max_epu8(diff1, diff2);
+
+      __m128i cmp = _mm_cmpeq_epi8(abs_diff, one);
+      eq_cnt += my_mm_popcnt_epi8(cmp);
+    }
+  }
+
+  int useDC2 = (eq_cnt > moderate_v);
+  return useDC2;
+}
+
+#else
+/* decide DC mode or default mode in assembler */
+int deblock_vert_useDC(uint8_t *v, int stride, int moderate_v) 
+{
+  const uint64_t mask   = 0xfefefefefefefefe;
+  uint32_t mm_data1;
+  uint64_t *pmm1;
+  int eq_cnt, useDC;
+  #ifdef PP_SELF_CHECK
+  int useDC2, i, j;
+  #endif
+
+  #ifdef PP_SELF_CHECK
+  /* C-code version for testing */
+  eq_cnt = 0;
+  for (j=1; j<8; j++) 
+  {
+    for (i=0; i<8; i++) 
+    {
+      if (ABS(v[j*stride+i] - v[(j+1)*stride+i]) <= 1) eq_cnt++;
+    }
+  }
+  useDC2 = (eq_cnt > moderate_v); 
 	#endif
 			
 	/* starting pointer is at v[stride] == v1 in mpeg4 notation */
@@ -2304,123 +3074,268 @@ int deblock_vert_useDC(uint8_t *v, int stride, int moderate_v)
 	if (useDC != useDC2) dprintf("ERROR: MMX version of useDC is incorrect\n");
 	#endif
 
-	__asm emms;
-
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 	return useDC;
 }
+#endif
 
-
-/* this is the de_ringing filter */
-// new MMXSSE version - trbarry 3/15/2002
-// modified calling sequence for smoothD2() - Jim Conklin 1-20-2013
-void dering(uint8_t *image, int height, int width, int quant) {      
+#ifdef USE_NEW_INTRINSICS
+// PF converted to intrinsics sse4.2 or maybe less
+void dering(uint8_t* image, int height, int width, int quant) {
 	int stride = width;
 	int x, y;
-	uint8_t *b8x8, *b10x10;
+  uint8_t* b8x8, * b10x10;
 	uint8_t b8x8filtered[64];
 	int max_diff;
 	uint8_t min, max, thr, range;
 	uint8_t max_diffq[8];	// a qword value of max_diff
 
+  // loop over all the 8x8 blocks in the image...
+  // don't process outer row of blocks for the time being.
+  for (y = 8; y < height - 8; y += 8) {
+    for (x = 8; x < width - 8; x += 8) {
+      // pointer to the top left pixel in 8x8 block
+      b8x8 = &(image[stride * y + x]);
 
-	/* loop over all the 8x8 blocks in the image... */
-	/* don't process outer row of blocks for the time being. */
-	for (y=8; y<height-8; y+=8) 
-	{
-		for (x=8; x< width-8; x+=8) 
-		{
-	
-			/* pointer to the top left pixel in 8x8   block */
-			b8x8   = &(image[stride*y + x]);
-			
-			/* pointer to the top left pixel in 10x10 block */
-			b10x10 = &(image[stride*(y-1) + (x-1)]);
-			
+      // pointer to the top left pixel in 10x10 block
+      b10x10 = &(image[stride * (y - 1) + (x - 1)]);
+
+      {
 			// Threshold determination - find min and max grey levels in the block 
-			// but remove loop through 64 bytes.  trbarry 03/13/2002
+        __m128i min_val = _mm_loadl_epi64((__m128i*)b8x8);
+        __m128i max_val = min_val;
 
-			__asm 
-			{
-			mov		esi, b8x8		// the block addr
-			mov		eax, stride		// offset to next qword in block
+        for (int i = 1; i < 8; ++i) {
+          __m128i row = _mm_loadl_epi64((__m128i*)(b8x8 + i * stride));
+          min_val = _mm_min_epu8(min_val, row);
+          max_val = _mm_max_epu8(max_val, row);
+        }
 
-			movq	mm0, qword ptr[esi] // row 0, 1st qword is our min
-			movq    mm1, mm0			// .. and our max
+        // get min of 8 bytes in min_val
+        min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 4));
+        min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 2));
+        min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 1));
+        min = _mm_extract_epi8(min_val, 0);
 
-			pminub	mm0, qword ptr[esi+eax]		// row 1
-			pmaxub	mm1, qword ptr[esi+eax] 
-
-			lea		esi, [esi+2*eax]			// bump for next 2
-			pminub	mm0, qword ptr[esi]			// row 2
-			pmaxub	mm1, qword ptr[esi] 
-
-			pminub	mm0, qword ptr[esi+eax]		// row 3
-			pmaxub	mm1, qword ptr[esi+eax] 
-
-			lea		esi, [esi+2*eax]			// bump for next 2
-			pminub	mm0, qword ptr[esi]			// row 4
-			pmaxub	mm1, qword ptr[esi] 
-
-			pminub	mm0, qword ptr[esi+eax]		// row 5
-			pmaxub	mm1, qword ptr[esi+eax] 
-
-			lea		esi, [esi+2*eax]			// bump for next 2
-			pminub	mm0, qword ptr[esi]			// row 6
-			pmaxub	mm1, qword ptr[esi] 
-
-			pminub	mm0, qword ptr[esi+eax]		// row 7
-			pmaxub	mm1, qword ptr[esi+eax] 
-
-			// get min of 8 bytes in mm0
-			pshufw	mm2, mm0, (3 << 2) + 2			// words 3,2 into low words of mm2
-			pminub	mm0, mm2						// now 4 min bytes in low half of mm0
-			pshufw  mm2, mm0, 1  		 		    // get word 1 of mm0 in low word of mm2
-			pminub	mm0, mm2						// got it down to 2 bytes
-			movq	mm2, mm0						
-			psrlq	mm2, 8							// byte 1 to low byte
-			pminub	mm0, mm2						// our answer in low order byte
-			movd	eax, mm0						
-			mov		min, al							// save answer
-
-			// get max of 8 bytes in mm1
-			pshufw	mm2, mm1, (3 << 2) + 2			// words 3,2 into low words of mm2
-			pmaxub	mm1, mm2						// now 4 max bytes in low half of mm1
-			pshufw  mm2, mm1, 1  		 		    // get word 1 of mm1 in low word of mm2
-			pmaxub	mm1, mm2						// got it down to 2 bytes
-			movq	mm2, mm1						
-			psrlq	mm2, 8							// byte 1 to low byte
-			pmaxub	mm1, mm2						// our answer in low order byte
-			movd	eax, mm1						
-			mov		max, al							// save answer
-
-			emms;
-			}
-			
-			/* Threshold determination - compute threshold and dynamic range */
-			thr = (max + min + 1) >> 1; // Nick / 2 changed to >> 1
+        // get max of 8 bytes in max_val
+        max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 4));
+        max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 2));
+        max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 1));
+        max = _mm_extract_epi8(max_val, 0);
+      }
+      // Threshold determination - compute threshold and dynamic range
+      thr = (max + min + 1) >> 1;
 			range = max - min;
 
-			max_diff = quant>>1;
-			max_diffq[0] = max_diffq[1] = max_diffq[2] = max_diffq[3] 
-				= max_diffq[4] = max_diffq[5] = max_diffq[6] = max_diffq[7]
-				= (uint8_t)max_diff;
+      max_diff = quant >> 1;
+      for (int i = 0; i < 8; ++i) {
+        max_diffq[i] = (uint8_t)max_diff;
+      }
 
-			/* To optimize in MMX it's better to always fill in the b8x8filtered[] array
-
-			b8x8filtered[8*v + h] = ( 8
-				+ 1 * b10x10[stride*(v+0) + (h+0)] + 2 * b10x10[stride*(v+0) + (h+1)] 
-														+ 1 * b10x10[stride*(v+0) + (h+2)]
-				+ 2 * b10x10[stride*(v+1) + (h+0)] + 4 * b10x10[stride*(v+1) + (h+1)] 
-														+ 2 * b10x10[stride*(v+1) + (h+2)]
-				+ 1 * b10x10[stride*(v+2) + (h+0)] + 2 * b10x10[stride*(v+2) + (h+1)]
-														+ 1 * b10x10[stride*(v+2) + (h+2)]
-					 >> 4;	// Nick / 16 changed to >> 4
-
-			Note - As near as I can see, (a + 2*b + c)/4 = avg( avg(a,c), b) and likewise vertical. So since
-			there is a nice pavgb MMX instruction that gives a rounded vector average we may as well use it.
-			*/
 			// Fill in b10x10 array completely with  2 dim center weighted average
 			// This section now also includes the clipping step.
+      // (Implementation of this part would follow similarly using SSE4.2 intrinsics)
+
+      // 2nd asm block
+// Threshold determination - find min and max grey levels in the block
+      {
+        __m128i min_val = _mm_loadl_epi64((__m128i*)b8x8);
+        __m128i max_val = min_val;
+
+        for (int i = 1; i < 8; ++i) {
+          __m128i row = _mm_loadl_epi64((__m128i*)(b8x8 + i * stride));
+          min_val = _mm_min_epu8(min_val, row);
+          max_val = _mm_max_epu8(max_val, row);
+        }
+
+        // get min of 8 bytes in min_val
+        min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 4));
+        min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 2));
+        min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 1));
+        min = _mm_extract_epi8(min_val, 0);
+
+        // get max of 8 bytes in max_val
+        max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 4));
+        max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 2));
+        max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 1));
+        max = _mm_extract_epi8(max_val, 0);
+
+        // Threshold determination - compute threshold and dynamic range
+        thr = (max + min + 1) >> 1;
+        range = max - min;
+
+        max_diff = quant >> 1;
+        for (int i = 0; i < 8; ++i) {
+          max_diffq[i] = (uint8_t)max_diff;
+        }
+
+        // Fill in b10x10 array completely with 2 dim center weighted average
+        // This section now also includes the clipping step.
+        __m128i max_diff_vec = _mm_set1_epi8((char)max_diff);
+
+        for (int i = 0; i < 8; ++i) {
+          __m128i line0 = _mm_loadl_epi64((__m128i*)(b10x10 + i * stride));
+          __m128i line1 = _mm_loadl_epi64((__m128i*)(b10x10 + (i + 1) * stride));
+          __m128i line2 = _mm_loadl_epi64((__m128i*)(b10x10 + (i + 2) * stride));
+
+          __m128i avg1 = _mm_avg_epu8(line0, line2);
+          __m128i avg2 = _mm_avg_epu8(avg1, line1);
+
+          __m128i min_clip = _mm_subs_epu8(line1, max_diff_vec);
+          __m128i max_clip = _mm_adds_epu8(line1, max_diff_vec);
+
+          avg2 = _mm_max_epu8(avg2, min_clip);
+          avg2 = _mm_min_epu8(avg2, max_clip);
+
+          _mm_storel_epi64((__m128i*)(b8x8filtered + i * 8), avg2);
+        }
+      }
+
+      // 3rd asm block
+      {
+        __m128i thr_vec = _mm_set1_epi8(thr);
+        __m128i zero = _mm_setzero_si128();
+
+        for (int i = 0; i < 8; ++i) {
+          __m128i line_m1 = _mm_loadl_epi64((__m128i*)(b10x10 + (i - 1) * stride + 1));
+          __m128i line0 = _mm_loadl_epi64((__m128i*)(b10x10 + i * stride + 1));
+          __m128i line1 = _mm_loadl_epi64((__m128i*)(b10x10 + (i + 1) * stride + 1));
+
+          __m128i cmp_m1 = _mm_cmpeq_epi8(_mm_subs_epu8(thr_vec, line_m1), zero);
+          __m128i cmp0 = _mm_cmpeq_epi8(_mm_subs_epu8(thr_vec, line0), zero);
+          __m128i cmp1 = _mm_cmpeq_epi8(_mm_subs_epu8(thr_vec, line1), zero);
+
+          __m128i avg_m1 = _mm_avg_epu8(line_m1, line0);
+          __m128i avg0 = _mm_avg_epu8(line0, line1);
+          __m128i avg1 = _mm_avg_epu8(line1, line_m1);
+
+          __m128i combined_avg = _mm_avg_epu8(_mm_avg_epu8(avg_m1, avg0), avg1);
+
+          __m128i filtered = _mm_loadl_epi64((__m128i*)(b8x8filtered + i * 8));
+          __m128i result = _mm_or_si128(_mm_and_si128(cmp0, line0), _mm_andnot_si128(cmp0, filtered));
+
+          _mm_storel_epi64((__m128i*)(b8x8 + i * stride), result);
+        }
+      }
+
+    }
+  }
+}
+
+#else
+/* this is the de_ringing filter */
+// new MMXSSE version - trbarry 3/15/2002
+// modified calling sequence for smoothD2() - Jim Conklin 1-20-2013
+void dering(uint8_t *image, int height, int width, int quant) {      
+  int stride = width;
+  int x, y;
+  uint8_t *b8x8, *b10x10;
+  uint8_t b8x8filtered[64];
+  int max_diff;
+  uint8_t min, max, thr, range;
+  uint8_t max_diffq[8];	// a qword value of max_diff
+
+
+  /* loop over all the 8x8 blocks in the image... */
+  /* don't process outer row of blocks for the time being. */
+  for (y=8; y<height-8; y+=8) 
+  {
+    for (x=8; x< width-8; x+=8) 
+    {
+  
+      /* pointer to the top left pixel in 8x8   block */
+      b8x8   = &(image[stride*y + x]);
+      
+      /* pointer to the top left pixel in 10x10 block */
+      b10x10 = &(image[stride*(y-1) + (x-1)]);
+      
+      // Threshold determination - find min and max grey levels in the block 
+      // but remove loop through 64 bytes.  trbarry 03/13/2002
+
+      __asm 
+      {
+      mov		esi, b8x8		// the block addr
+      mov		eax, stride		// offset to next qword in block
+
+      movq	mm0, qword ptr[esi] // row 0, 1st qword is our min
+      movq    mm1, mm0			// .. and our max
+
+      pminub	mm0, qword ptr[esi+eax]		// row 1
+      pmaxub	mm1, qword ptr[esi+eax] 
+
+      lea		esi, [esi+2*eax]			// bump for next 2
+      pminub	mm0, qword ptr[esi]			// row 2
+      pmaxub	mm1, qword ptr[esi] 
+
+      pminub	mm0, qword ptr[esi+eax]		// row 3
+      pmaxub	mm1, qword ptr[esi+eax] 
+
+      lea		esi, [esi+2*eax]			// bump for next 2
+      pminub	mm0, qword ptr[esi]			// row 4
+      pmaxub	mm1, qword ptr[esi] 
+
+      pminub	mm0, qword ptr[esi+eax]		// row 5
+      pmaxub	mm1, qword ptr[esi+eax] 
+
+      lea		esi, [esi+2*eax]			// bump for next 2
+      pminub	mm0, qword ptr[esi]			// row 6
+      pmaxub	mm1, qword ptr[esi] 
+
+      pminub	mm0, qword ptr[esi+eax]		// row 7
+      pmaxub	mm1, qword ptr[esi+eax] 
+
+      // get min of 8 bytes in mm0
+      pshufw	mm2, mm0, (3 << 2) + 2			// words 3,2 into low words of mm2
+      pminub	mm0, mm2						// now 4 min bytes in low half of mm0
+      pshufw  mm2, mm0, 1  		 		    // get word 1 of mm0 in low word of mm2
+      pminub	mm0, mm2						// got it down to 2 bytes
+      movq	mm2, mm0						
+      psrlq	mm2, 8							// byte 1 to low byte
+      pminub	mm0, mm2						// our answer in low order byte
+      movd	eax, mm0						
+      mov		min, al							// save answer
+
+      // get max of 8 bytes in mm1
+      pshufw	mm2, mm1, (3 << 2) + 2			// words 3,2 into low words of mm2
+      pmaxub	mm1, mm2						// now 4 max bytes in low half of mm1
+      pshufw  mm2, mm1, 1  		 		    // get word 1 of mm1 in low word of mm2
+      pmaxub	mm1, mm2						// got it down to 2 bytes
+      movq	mm2, mm1						
+      psrlq	mm2, 8							// byte 1 to low byte
+      pmaxub	mm1, mm2						// our answer in low order byte
+      movd	eax, mm1						
+      mov		max, al							// save answer
+
+      emms;
+      }
+      
+      /* Threshold determination - compute threshold and dynamic range */
+      thr = (max + min + 1) >> 1; // Nick / 2 changed to >> 1
+      range = max - min;
+
+      max_diff = quant>>1;
+      max_diffq[0] = max_diffq[1] = max_diffq[2] = max_diffq[3] 
+        = max_diffq[4] = max_diffq[5] = max_diffq[6] = max_diffq[7]
+        = (uint8_t)max_diff;
+
+      /* To optimize in MMX it's better to always fill in the b8x8filtered[] array
+
+      b8x8filtered[8*v + h] = ( 8
+        + 1 * b10x10[stride*(v+0) + (h+0)] + 2 * b10x10[stride*(v+0) + (h+1)] 
+                            + 1 * b10x10[stride*(v+0) + (h+2)]
+        + 2 * b10x10[stride*(v+1) + (h+0)] + 4 * b10x10[stride*(v+1) + (h+1)] 
+                            + 2 * b10x10[stride*(v+1) + (h+2)]
+        + 1 * b10x10[stride*(v+2) + (h+0)] + 2 * b10x10[stride*(v+2) + (h+1)]
+                            + 1 * b10x10[stride*(v+2) + (h+2)]
+           >> 4;	// Nick / 16 changed to >> 4
+
+      Note - As near as I can see, (a + 2*b + c)/4 = avg( avg(a,c), b) and likewise vertical. So since
+      there is a nice pavgb MMX instruction that gives a rounded vector average we may as well use it.
+      */
+      // Fill in b10x10 array completely with  2 dim center weighted average
+      // This section now also includes the clipping step.
 			// trbarry 03/14/2002
 
 			_asm
@@ -2921,8 +3836,4 @@ void dering(uint8_t *image, int height, int width, int quant) {
 		}
 	}
 }
-
-
-
-
-
+#endif

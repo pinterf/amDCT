@@ -1,6 +1,11 @@
 
 #include <math.h>
 
+#include <stdint.h>
+#include <string.h>
+
+#include <emmintrin.h> // Header for SSE2 intrinsics
+
 #include "amDCTtypedefs.h"
 
 #include "DctLoop.h"
@@ -17,7 +22,7 @@
 #include "dct\fdct.h"
 #include "quant\quant_matrix.h"
 
-#define USE_INTEL_INTRINSICS_DCTLOOP
+#define USE_NEW_INTRINSICS_DCTLOOP
 
 void init_intra_matrixF(uint16_t *mpeg_quant_matrices, float quant);
 
@@ -25,10 +30,11 @@ void init_intra_matrixF(uint16_t *mpeg_quant_matrices, float quant);
 /*  // These prototypes are only for testing.
 void transfer_8to16copy_mmx(int16_t * const dst, const uint8_t * const src, uint32_t stride);
 void transfer8x8_copy_mmx(uint8_t * const dst, const uint8_t * const src, const uint32_t stride);
-void copy_add_16to16_clpsrc_c(uint16_t *dst,  int16_t *src, int32_t stride);
 */
+void copy_add_16to16_clpsrc_c(uint16_t* dst, int16_t* src, int32_t stride);
 
 void transfer_8to16copy_xmm(int16_t *dst, uint8_t *src, uint32_t stride);
+void transfer_8to16copy_c(int16_t* dst, uint8_t* src, uint32_t stride);
 void copy_add_16to16_clpsrc_xmm(uint16_t *dst, int16_t * const src, int32_t len);
 void quantDequant_xmm(int16_t *dct_block, const uint16_t *qtype1_matrix, const uint16_t *qtype1_matrix_quant);
 
@@ -42,11 +48,12 @@ void quantDequant_expandRange(int16_t        *dct_block,
 
 #define SCALEBITS 17
 
-
+#ifndef USE_NEW_INTRINSICS
 __declspec(align(16)) uint16_t  allFF[8]     = {0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff};
 __declspec(align(16)) uint16_t  negBit[8]    = {0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000};
 __declspec(align(16)) uint16_t  low15bits[8] = {0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff};
 __declspec(align(16)) uint16_t  lowB[8]      = {0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff};
+#endif
 
 
 
@@ -199,6 +206,7 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 			//transfer_8to16copy_mmx(dct_block, BF_workP, rowStride);    // NOT CURRENTLY COMPILED IN
 			//transfer_8to16copy_3dne(dct_block, BF_workP, rowStride);   // This is the same speed as the mmx version  NOT CURRENTLY COMPILED IN
 			transfer_8to16copy_xmm(dct_block, BF_workP, rowStride);  // fastest
+			// transfer_8to16copy_c(dct_block, BF_workP, rowStride); // test
 
 		   qtype = args->qtype;
 
@@ -324,7 +332,7 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 					break;
 							
 				case 2:  
-#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+#ifdef USE_NEW_INTRINSICS_DCTLOOP
           // _c instead of asm FIXME: implement sse2 x64 friendly
           quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
           dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
@@ -335,7 +343,7 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 					break;
 								
 				case 3:   
-#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+#ifdef USE_NEW_INTRINSICS_DCTLOOP
           // _c instead of asm FIXME: implement sse2 x64 friendly
           quant_mpeg_inter_c(coeff_block, dct_block, quant, quant_inter_matrix);
           dequant_mpeg_inter_c(dct_block, coeff_block, quant, quant_inter_matrix);
@@ -346,7 +354,7 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 					break;
 				
 				case 4:  
-#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+#ifdef USE_NEW_INTRINSICS_DCTLOOP
           // _c instead of asm FIXME: implement sse2 x64 friendly
           quant_h263_inter_c(coeff_block, dct_block, quant, quant_intra_matrix);
           dequant_h263_inter_c(dct_block, coeff_block, quant, quant_intra_matrix);
@@ -425,7 +433,7 @@ void DctLoop(int starti, int startj, DctLoop_args *args) {
 				
 									
 				default:
-#ifdef USE_INTEL_INTRINSICS_DCTLOOP
+#ifdef USE_NEW_INTRINSICS_DCTLOOP
           quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
           dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #else
@@ -497,7 +505,9 @@ fdct_only:
 			}
 											
 
-			__asm { emms }	
+#ifdef ARCH_IS_IA32
+			_mm_empty();
+#endif
 
 // speedTest:    //  NOTE UNCOMMENT IF DOING INNER LOOP  BYPASS SPEED TEST
 				/*
@@ -520,7 +530,9 @@ fdct_only:
 	} // end for blkRowSt
 
 
-	__asm { emms }	
+#ifdef ARCH_IS_IA32
+	_mm_empty();
+#endif
 	return;
 }
 
@@ -635,7 +647,39 @@ void quantDequant_expandRange(
 
 
 
+#ifdef USE_NEW_INTRINSICS
+__forceinline void copy_add_16to16_clpsrc_xmm(uint16_t* dst, int16_t* const src, int32_t stride) {
+  __m128i lowB = _mm_set1_epi16(0x00ff); // Assuming lowB is a constant value
+  __m128i zero = _mm_setzero_si128();
 
+  for (int i = 0; i < 8; ++i) {
+    __m128i src0 = _mm_load_si128((__m128i*)(src + i * stride));
+    __m128i dst0 = _mm_loadu_si128((__m128i*)(dst + i * stride));
+
+    __m128i src1 = _mm_load_si128((__m128i*)(src + i * stride + 8));
+    __m128i dst1 = _mm_loadu_si128((__m128i*)(dst + i * stride + 8));
+
+    __m128i src2 = _mm_load_si128((__m128i*)(src + i * stride + 16));
+    __m128i dst2 = _mm_loadu_si128((__m128i*)(dst + i * stride + 16));
+
+    src0 = _mm_max_epi16(src0, zero);
+    src1 = _mm_max_epi16(src1, zero);
+    src2 = _mm_max_epi16(src2, zero);
+
+    src0 = _mm_min_epi16(src0, lowB);
+    src1 = _mm_min_epi16(src1, lowB);
+    src2 = _mm_min_epi16(src2, lowB);
+
+    __m128i result0 = _mm_adds_epi16(src0, dst0);
+    __m128i result1 = _mm_adds_epi16(src1, dst1);
+    __m128i result2 = _mm_adds_epi16(src2, dst2);
+
+    _mm_storeu_si128((__m128i*)(dst + i * stride), result0);
+    _mm_storeu_si128((__m128i*)(dst + i * stride + 8), result1);
+    _mm_storeu_si128((__m128i*)(dst + i * stride + 16), result2);
+  }
+}
+#else
 __forceinline void copy_add_16to16_clpsrc_xmm(uint16_t *dst,  int16_t * const src, int32_t stride) {
 
 	stride=stride<<1;
@@ -751,14 +795,74 @@ __forceinline void copy_add_16to16_clpsrc_xmm(uint16_t *dst,  int16_t * const sr
 	
 	return;
 }
+#endif
 
+void quantDequant_c(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
 
+  int16_t negBit = 0x8000;
+ 
+  for (int i = 0; i < 64; ++i) {
+    int16_t value = dct_block[i];
+    int16_t sign = value & negBit;
+    int16_t abs_value = value < 0 ? -value : value;
 
+    int16_t level = (abs_value * qtype1_matrix[i] + 32768) >> 16;
+    level = (level * qtype1_matrix_quant[i]) >> 3;
+
+    if (sign) {
+      level = -level;
+    }
+
+    dct_block[i] = level;
+  }
+}
 
 
  
- 
+#ifdef USE_NEW_INTRINSICS 
+__forceinline void quantDequant_xmm(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
+  __m128i low15bits = _mm_set1_epi16(0x7FFF); // Mask for low 15 bits
+  __m128i allFF = _mm_set1_epi16(0xFFFF); // Mask for all bits set
+  __m128i negBit = _mm_set1_epi16(0x8000); // Mask for the sign bit
 
+  for (int i = 0; i < 8; ++i) {
+    __m128i xmm0 = _mm_load_si128((__m128i*) & dct_block[i * 8]); // Load dct_block
+    __m128i xmm6 = _mm_and_si128(xmm0, low15bits); // xmm6 = xmm0 & low15bits
+
+    __m128i xmm1 = _mm_load_si128((__m128i*) & qtype1_matrix[i * 8]); // Load qtype1_matrix
+    __m128i xmm2 = _mm_load_si128((__m128i*) & qtype1_matrix_quant[i * 8]); // Load qtype1_matrix_quant
+
+    __m128i xmm7 = _mm_cmpeq_epi16(xmm6, xmm0); // xmm7 = (xmm6 == xmm0)
+    xmm7 = _mm_xor_si128(xmm7, allFF); // xmm7 = ~xmm7
+
+    __m128i xmm4 = _mm_setzero_si128(); // xmm4 = 0
+    xmm4 = _mm_sub_epi16(xmm4, xmm0); // xmm4 = -xmm0
+
+    xmm0 = _mm_and_si128(xmm0, xmm6); // xmm0 = xmm0 & xmm6
+    xmm2 = _mm_and_si128(xmm2, xmm7); // xmm2 = xmm2 & xmm7
+    xmm2 = _mm_add_epi16(xmm2, xmm0); // xmm2 = xmm2 + xmm0
+
+    __m128i xmm3 = _mm_mullo_epi16(xmm2, xmm1); // xmm3 = xmm2 * xmm1
+    xmm2 = _mm_mulhi_epi16(xmm2, xmm1); // xmm2 = (xmm2 * xmm1) >> 16
+
+    xmm3 = _mm_and_si128(xmm3, negBit); // xmm3 = xmm3 & negBit
+    xmm3 = _mm_srli_epi16(xmm3, 15); // xmm3 = xmm3 >> 15
+    xmm2 = _mm_add_epi16(xmm2, xmm3); // xmm2 = xmm2 + xmm3
+
+    xmm2 = _mm_mullo_epi16(xmm2, xmm1); // xmm2 = xmm2 * qtype1_matrix_quant
+    xmm2 = _mm_srai_epi16(xmm2, 3); // xmm2 = xmm2 >> 3
+
+    xmm4 = _mm_setzero_si128(); // xmm4 = 0
+    xmm4 = _mm_sub_epi16(xmm4, xmm2); // xmm4 = -xmm2
+
+    xmm7 = _mm_and_si128(xmm7, xmm4); // xmm7 = xmm7 & xmm4
+    xmm6 = _mm_and_si128(xmm6, xmm2); // xmm6 = xmm6 & xmm2
+    xmm6 = _mm_add_epi16(xmm6, xmm7); // xmm6 = xmm6 + xmm7
+
+    _mm_store_si128((__m128i*) & dct_block[i * 8], xmm6); // Store result back to dct_block
+  }
+}
+#else
 __forceinline void quantDequant_xmm( int16_t *dct_block, 
 				   const uint16_t *qtype1_matrix, 
 				   const uint16_t *qtype1_matrix_quant) {
@@ -834,10 +938,24 @@ __forceinline void quantDequant_xmm( int16_t *dct_block,
 
 return;
 }
+#endif
 
 
+#ifdef USE_NEW_INTRINSICS 
+__forceinline void transfer_8to16copy_xmm(int16_t* dst, uint8_t* src, uint32_t stride) {
+  __m128i xmm0 = _mm_setzero_si128(); // Set xmm0 to zero
 
-
+  for (int i = 0; i < 8; ++i) {
+    // C++ __m128i xmm1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(src)); // Load 8 bytes from src
+    __m128i xmm1 = _mm_loadl_epi64((__m128i*)(src)); // Load 8 bytes from src
+    src += stride; // Move to the next row
+    xmm1 = _mm_unpacklo_epi8(xmm1, xmm0); // Unpack bytes to words
+    // c++ _mm_store_si128(reinterpret_cast<__m128i*>(dst), xmm1); // Store the result in dst
+    _mm_store_si128((__m128i*)(dst), xmm1); // Store the result in dst
+    dst += 8; // Move to the next 8 words in dst
+  }
+}
+#else
 __forceinline void transfer_8to16copy_xmm(int16_t *dst, uint8_t *src, uint32_t stride) {
 
 	__asm {
@@ -903,6 +1021,22 @@ __forceinline void transfer_8to16copy_xmm(int16_t *dst, uint8_t *src, uint32_t s
 	}
 	
 	return;
+}
+#endif
+
+
+
+void transfer_8to16copy_c(int16_t* dst, uint8_t* src, uint32_t stride) {
+  int16_t temp[8];
+
+  for (int i = 0; i < 8; ++i) {
+    for (int j = 0; j < 8; ++j) {
+      temp[j] = src[j]; // Copy and extend each byte to int16_t
+    }
+    memcpy(dst, temp, sizeof(temp)); // Copy the extended values to dst
+    src += stride; // Move to the next row
+    dst += 8; // Move to the next 8 words in dst
+  }
 }
 
 

@@ -17,6 +17,7 @@
 
 
 
+#include <smmintrin.h> // SSE4.2
 
 
 
@@ -998,6 +999,96 @@ int showBlockDetail(FrameInfo_args *FrameInfoArgs, uint8_t showMask) {
 #undef	BPP
 #define BPP 1
 
+#ifdef USE_NEW_INTRINSICS
+// This macro gets the high and low values of the 8 surrounding pixels. Register esi
+// is assumed to point one line above the target pixel and reg ebx is assumed to
+// contain the source pitch. Defined value BPP must be set to bytes per pixel,
+// either 1 for YV12 or 2 for YUY2. Answer returned in mm0, mm1
+#define GetMinMax(esi, ebx, mm0, mm1) \
+{ \
+    __m128i above_left = _mm_loadl_epi64((__m128i*)(esi - BPP)); \
+    __m128i above_center = _mm_loadl_epi64((__m128i*)(esi)); \
+    __m128i above_right = _mm_loadl_epi64((__m128i*)(esi + BPP)); \
+    __m128i left = _mm_loadl_epi64((__m128i*)(esi + ebx - BPP)); \
+    __m128i right = _mm_loadl_epi64((__m128i*)(esi + ebx + BPP)); \
+    __m128i bottom_left = _mm_loadl_epi64((__m128i*)(esi + 2 * ebx - BPP)); \
+    __m128i bottom_center = _mm_loadl_epi64((__m128i*)(esi + 2 * ebx)); \
+    __m128i bottom_right = _mm_loadl_epi64((__m128i*)(esi + 2 * ebx + BPP)); \
+    mm0 = _mm_min_epu8(above_left, above_center); \
+    mm1 = _mm_max_epu8(above_left, above_center); \
+    mm0 = _mm_min_epu8(mm0, above_right); \
+    mm1 = _mm_max_epu8(mm1, above_right); \
+    mm0 = _mm_min_epu8(mm0, left); \
+    mm1 = _mm_max_epu8(mm1, left); \
+    mm0 = _mm_min_epu8(mm0, right); \
+    mm1 = _mm_max_epu8(mm1, right); \
+    mm0 = _mm_min_epu8(mm0, bottom_left); \
+    mm1 = _mm_max_epu8(mm1, bottom_left); \
+    mm0 = _mm_min_epu8(mm0, bottom_center); \
+    mm1 = _mm_max_epu8(mm1, bottom_center); \
+    mm0 = _mm_min_epu8(mm0, bottom_right); \
+    mm1 = _mm_max_epu8(mm1, bottom_right); \
+}
+
+void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight) {
+  const uint8_t* pSrc = srcp;
+  uint8_t* pDest = dstp;
+	  int y;
+
+	memcpy(pDest, pSrc, row_size);		// copy first line
+  memcpy(pDest + dst_pit * (FldHeight - 1), pSrc + src_pit * (FldHeight - 1), row_size); // and last
+  pDest += dst_pit;
+
+  for (y = 1; y <= FldHeight - 2; y++) {
+    const uint8_t* esi = pSrc;
+    uint8_t* edi = pDest;
+    int ecx = row_size >> 3; // do 8 bytes at a time
+
+		// do first  qword
+    __m128i mm0 = _mm_loadl_epi64((__m128i*)(esi + src_pit));
+    _mm_storel_epi64((__m128i*)edi, mm0);
+    esi += BPP; // skip over first pixel
+
+    __m128i mm1;
+    GetMinMax(esi, src_pit, mm0, mm1);
+    mm0 = _mm_max_epu8(mm0, _mm_loadl_epi64((__m128i*)(esi + src_pit)));
+    mm0 = _mm_min_epu8(mm0, mm1);
+    _mm_storel_epi64((__m128i*)(edi + BPP), mm0);
+
+		// do last qword
+    esi += row_size - 8 - BPP; // point at last qword
+    mm0 = _mm_loadl_epi64((__m128i*)(esi + src_pit));
+    _mm_storel_epi64((__m128i*)(edi + row_size - 8), mm0);
+    esi -= BPP; // back up one pixel
+
+    GetMinMax(esi, src_pit, mm0, mm1);
+    mm0 = _mm_max_epu8(mm0, _mm_loadl_epi64((__m128i*)(esi + src_pit)));
+    mm0 = _mm_min_epu8(mm0, mm1);
+    _mm_storel_epi64((__m128i*)(edi + row_size - BPP - 8), mm0);
+
+    esi = pSrc; // restore esi
+    ecx -= 1; // but both ends done manually
+    if (ecx == 0) goto AllDoneYV12; // too short, don't bother
+
+    while (ecx--) {
+      esi += 8; // bump to next qword
+      edi += 8;
+
+      GetMinMax(esi, src_pit, mm0, mm1);
+      mm0 = _mm_max_epu8(mm0, _mm_loadl_epi64((__m128i*)(esi + src_pit)));
+      mm0 = _mm_min_epu8(mm0, mm1);
+      _mm_storel_epi64((__m128i*)edi, mm0); // and store it
+    }
+
+AllDoneYV12:
+	// adjust for next line
+	pSrc  += src_pit;
+	pDest += dst_pit;
+	}
+
+}
+
+#else
 // This macro gets the high and low values of the 8 surrounding pixels. Register esi
 // is assumed to point one line above the target pixel and reg ebx is assumbed to
 // contain the source pitch. Defined value BPP must be set to bytes per pixel,
@@ -1021,7 +1112,6 @@ __asm { \
 		__asm pminub mm0, qword ptr[esi+2*ebx+BPP]	/* bottom right */ \
 		__asm pmaxub mm1, qword ptr[esi+2*ebx+BPP]	/* bottom right */ \
 }
-
 
 
 void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t *srcp, uint8_t *dstp, int FldHeight)
@@ -1094,11 +1184,11 @@ AllDoneYV12:
 	pDest += dst_pit;
 	}
 
-	__asm { emms }
 
 	return;
 }
 
+#endif
 
 
 
