@@ -1,6 +1,8 @@
 ###
 #  This file contains the amDCTc() script routine.
 #
+# Changelog:
+#   (20241128) fix sharpTAmt typo
 
 ###
 #  REQUIRED ROUTINES
@@ -66,7 +68,7 @@ expand      = default( expand,       0 )
 sharpWPos   = default( sharpWPos,    0 )  
 sharpTPos   = default( sharpTPos,    0 )  
 sharpWAmt   = default( sharpWAmt,    0 )  
-sharpWAmt   = default( sharpTAmt,    0 )  
+sharpTAmt   = default( sharpTAmt,    0 )  
 cWarpToLuma = default( cWarpToLuma,  0 ) 
 downSize    = default( downSize,     1 ) 
 ncpu        = default( ncpu,         1 ) 
