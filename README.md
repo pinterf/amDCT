@@ -13,6 +13,11 @@ Only YV12 (8 bit YUV 4:2:0) format is supported.
 See documentation separately.
 
 ## Changelog
+- (20241128) (technical update)
+
+  - arrange source to GitHub
+  - fixed sharpTAmt typo in the wrapper avs script
+  - project is now public on GitHub
 
 - (20241127) v1.4.1, (Ferenc Pintér)
 
