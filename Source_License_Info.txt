@@ -1,0 +1,93 @@
+The following software and documentation is contained in the amDCT package.
+
+1: The software of the original research upon which the SmoothD, SmoothD2, and amDCT dlls are based is in   
+       "SmoothD2\CodeCopiedFrom_OriginalSources\SmoothD009pre2_src\source from orig paper"
+   The file README.IJG in that directory contains license information for some code used 
+   in the research paper code.  It seems to be a simple open source license.
+
+2: The excellent paper
+
+      Enhancement of JPEG-Compressed Images by
+      Re-application of JPEG
+      Aria Nosratinia (aria@utdallas.edu)
+      Department of Electrical Engineering, University of Texas at Dallas, Richardson,
+      TX 75083
+
+   which describes the algorithm of the original research is in the file "JPEG resampling paper.pdf" in
+      "amDCT\documentation"
+   is well worth studing. It carries no explicit copyright that I saw.
+
+ 
+3: The software for SmoothD in
+       "amDCT\CodeCopiedFrom_OriginalSources\SmoothD009pre2_src"
+   Has no explicit copyright information that I saw.
+   The manual page at http://www.funknmary.de/bergdichter/projekte/video/SmoothD/ 
+   which links to the source code download has the following copyright notice
+
+      Version 0.0.9pre2 November 8th, 2004
+      Copyright (C) 2004 Tobias Bergmann.
+      contact: tobias.bergmann at bergdichter.de
+
+   Thank you Tobias Bergmann.  Without your code as a guide I would never started working
+   on SmoothD2.  I really only intended to fix the bug that kept me from being able to
+   call SmoothD more then once.  Then I started to see lots of different things I could
+   do.  Most of them were worthless but by the time I found that out I had done a fairly
+   major rewrite.  
+
+
+4: The software for xvid-1.3.2 in
+       "amDCT\CodeCopiedFrom_OriginalSources\xvidcore-1.3.2.zip"
+   is covered by
+	GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+   a copy is in the file gpl.txt
+   in "amDCT"
+
+5: The file avisynth.h in
+      "amDCT"
+   is covered by
+	GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+   a copy is in the file gpl.txt
+   in "amDCT"
+
+6: The software for dgdecode in
+      "amDCT\CodeCopiedFrom_OriginalSources\dgdecode158src"
+   is covered by
+	GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+   a copy is in the file gpl.txt
+   in "amDCT"
+
+7: The software for smoothD2 in
+      "amDCT"
+   is covered by
+	GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+   a copy is in the file gpl.txt
+   in "amDCT"
+
+8: The software for amDCT in
+      "amDCT"
+   is covered by
+	GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+   a copy is in the file gpl.txt
+   in "amDCT"
+
+9: AgnerFogCode  provides A multi-platform library of highly optimized functions for C and C++. 
+   By Agner Fog. 2003-2012.  GNU General Public License. 
+
+10: Code from Ivan Kuckir's blog,  http://blog.ivank.net  which had the following on it.
+                       "All code that you see at this blog is free to use, under MIT licence."
+
+     Thank you Ivan Kuckir for making your code available and for your explanations of how it works.
+
+     I translated fastest-gaussian-blur into C from the javascript code 
+	and modified the center weight function to better suit the needs of amDCT.
+
+
+  
+
+NOTE:  I have included items 1, 2, 3, 4, 5, 6, and 7 in this package for the following reasons.
+
+	1. To provide some historical background to the code.
+	2. To acknowledge that work.
+	3. Because I hate having to track down papers and software that may no longer 
+           reside on the web.  People move, domains change, etc.
+
