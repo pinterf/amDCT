@@ -502,7 +502,7 @@ AVSValue __cdecl Create_amDCT(AVSValue args, void* user_data, IScriptEnvironment
 	return new amDCT( args[0].AsClip(),
 						 args[1].AsClip(),		// Our 20th parameter pf1		      default NULL     NOT IMPLIMENTED YET
 						 args[2].AsClip(),		// Our 21th parameter bf1		      default NULL     NOT IMPLIMENTED YET
-						 args[3].AsInt(0),	    // Our  1st parameter quant			  default 2
+						 args[3].AsInt(0),	    // Our  1st parameter quant			  default 0
 						 args[4].AsInt(0),	    // Our  2st parameter adapt			  default 0
 						 args[5].AsInt(3),	    // Our  3nd parameter shift		      default 3  	16 shifts. Best speed vs. quality trade off.
 						 args[6].AsInt(1),	    // Our  4rd parameter matrix		  default 1
