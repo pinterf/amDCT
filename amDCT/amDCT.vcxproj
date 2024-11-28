@@ -302,6 +302,9 @@
     <ClCompile Include="transfer_add.c" />
     <ClCompile Include="Utilities.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="amDCT.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
