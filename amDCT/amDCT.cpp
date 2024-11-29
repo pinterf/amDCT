@@ -36,6 +36,8 @@ class amDCT : public GenericVideoFilter {
   int   T2;
   int   ncpu;
 
+  bool has_at_least_v8; // v8 interface frameprop copy support
+
 public:
 
   amDCT(PClip _child, const PClip _pf1, const PClip _bf1, const int _quant, const int _adapt, const int _shift, const int _matrix, const int _qtype, const int _sharpWPos, const int _sharpWAmt, const int _expand, const int _sharpTPos, const int _sharpTAmt, const int _quality, const int _brightStart, const int _brightAmt, const int _darkStart, const int _darkAmt, const int _showMask, const int _T2, const int _ncpu, IScriptEnvironment* env);
@@ -47,6 +49,10 @@ public:
 //Here is the actual constructor code used
 amDCT::amDCT(PClip _child, PClip _pf1, PClip _bf1, const int _quant, const int _adapt, const int _shift, const int _matrix, const int _qtype, const int _sharpWPos, const int _sharpWAmt, const int _expand, const int _sharpTPos, const int _sharpTAmt, const int _quality, const int _brightStart, const int _brightAmt, const int _darkStart, const int _darkAmt, const int _showMask, const int _T2, const int _ncpu, IScriptEnvironment* env) :
   GenericVideoFilter(_child), pf1(_pf1), bf1(_bf1), quant(_quant), adapt(_adapt), shift(_shift), matrix(_matrix), qtype(_qtype), sharpWPos(_sharpWPos), sharpWAmt(_sharpWAmt), expand(_expand), sharpTPos(_sharpTPos), sharpTAmt(_sharpTAmt), quality(_quality), brightStart(_brightStart), brightAmt(_brightAmt), darkStart(_darkStart), darkAmt(_darkAmt), showMask(_showMask), T2(_T2), ncpu(_ncpu) {
+
+  has_at_least_v8 = true;
+  try { env->CheckVersion(8); }
+  catch (const AvisynthError&) { has_at_least_v8 = false; }
 
   if (!vi.IsYV12()) // is input planar?
     env->ThrowError("amDCT: input to filter must be in YV12");
@@ -122,7 +128,7 @@ PVideoFrame __stdcall amDCT::GetFrame(int n, IScriptEnvironment* env) {
 
   PVideoFrame src = child->GetFrame(n, env);
 
-  PVideoFrame dst = env->NewVideoFrame(vi);
+  PVideoFrame dst = has_at_least_v8 ? env->NewVideoFrameP(vi, &src) : env->NewVideoFrame(vi); // frame property support
 
   const unsigned char* srcp = src->GetReadPtr();
 
