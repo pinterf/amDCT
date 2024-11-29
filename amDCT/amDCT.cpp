@@ -17,24 +17,24 @@ class amDCT : public GenericVideoFilter {
   // define the parameter variable
   PClip pf1;
   PClip bf1;
-  int   quant;
-  int   adapt;
-  int   shift;
-  int   matrix;
-  int   qtype;
-  int  sharpWPos;
-  int  sharpWAmt;
-  int  expand;
-  int   sharpTPos;
-  int   sharpTAmt;
-  int   quality;
-  int   brightStart;
-  int  brightAmt;
-  int   darkStart;
-  int  darkAmt;
-  int   showMask;
-  int   T2;
-  int   ncpu;
+  const int quant;
+  const int adapt;
+  const int shift;
+  const int matrix;
+  const int qtype;
+  int       sharpWPos;
+  int       sharpWAmt;
+  const int expand;
+  int       sharpTPos;
+  int       sharpTAmt;
+  const int quality;
+  const int brightStart;
+  int       brightAmt;
+  const int darkStart;
+  int       darkAmt;
+  const int showMask;
+  const int T2;
+  const int ncpu;
 
   bool has_at_least_v8; // v8 interface frameprop copy support
 
@@ -115,6 +115,48 @@ amDCT::amDCT(PClip _child, PClip _pf1, PClip _bf1, const int _quant, const int _
   if ((ncpu < 1) || (ncpu > 4))
     env->ThrowError("amDCT: ncpu out of range (1-4)");
 
+  // Set the "dependency default values".
+  // Dependency default values depend on the values of other arguments.
+  // The "AVSValue __cdecl Create_amDCT() constructor" at the bottom of this file
+  // has set the dependency default values to an impossible value and the used values are computed here.
+
+  // -- !! The same parameter checking and conversion is done both in filter constructor and the actual main processing
+
+  // Set the default sharpWPos and sharpTPos if only sharpWAmt or sharpTAmt is specified.
+  if (sharpWPos == 255 && sharpTPos != 255) sharpWPos = sharpTPos;
+  if (sharpTPos == 255 && sharpWPos != 255) sharpTPos = sharpWPos;
+
+  // If neither sharpWPos or sharpTPos have been set then use their defaults.
+  if (sharpWPos == 255 && sharpTPos == 255 && sharpWAmt != 255)  sharpWPos = 5;
+  if (sharpWPos == 255 && sharpTPos == 255 && sharpTAmt != 255)  sharpTPos = 7;
+
+  if (sharpWAmt == 255 && sharpTAmt != 255) sharpWAmt = sharpTAmt;
+  if (sharpTAmt == 255 && sharpWAmt != 255) sharpTAmt = sharpWAmt;
+
+  if (sharpWAmt == 255 && sharpTAmt == 255 ||
+    sharpWPos == 255 && sharpTPos == 255) {
+
+    sharpWAmt = 0;
+    sharpTAmt = 0;
+    sharpWPos = 0;
+    sharpTPos = 0;
+  }
+
+  if (sharpTPos == 255 && sharpWPos != 255) {
+    sharpTPos = sharpWPos;
+    sharpTAmt = sharpWAmt;
+  }
+
+  if (sharpTPos != 255 && sharpWPos == 255) {
+    sharpWPos = sharpTPos;
+    sharpWAmt = sharpTAmt;
+  }
+
+  // --- !! End of similarity
+
+  if (brightStart >= 255) brightAmt = 0;
+  if (darkStart <= 0)   darkAmt = 0;
+
 }
 
 
@@ -175,45 +217,6 @@ PVideoFrame __stdcall amDCT::GetFrame(int n, IScriptEnvironment* env) {
   // Mod8 is required for the core amDCT algorithm to work.
   // Mod16 keeps the start of each row aligned at multiples of 16 bytes to optimize mmx
   src_width = (src_width + 15) & ~15;  // 15 = ALIGN-1  // ALIGN must be a power of 2
-
-  // Set the "dependency default values".
-  // Dependency default values depend on the values of other arguments.
-  // The "AVSValue __cdecl Create_amDCT() constructor" at the bottom of this file
-  // has set the dependency default values to an impossible value and the used values are computed here.
-
-  // Set the default sharpWPos and sharpTPos if only sharpWAmt or sharpTAmt is specified.
-  if (sharpWPos == 255 && sharpTPos != 255) sharpWPos = sharpTPos;
-  if (sharpTPos == 255 && sharpWPos != 255) sharpTPos = sharpWPos;
-
-  // If neither sharpWPos or sharpTPos have been set then use their defaults.
-  if (sharpWPos == 255 && sharpTPos == 255 && sharpWAmt != 255)  sharpWPos = 5;
-  if (sharpWPos == 255 && sharpTPos == 255 && sharpTAmt != 255)  sharpTPos = 7;
-
-  if (sharpWAmt == 255 && sharpTAmt != 255) sharpWAmt = sharpTAmt;
-  if (sharpTAmt == 255 && sharpWAmt != 255) sharpTAmt = sharpWAmt;
-
-  if (sharpWAmt == 255 && sharpTAmt == 255 ||
-    sharpWPos == 255 && sharpTPos == 255) {
-    //  if (sharpWAmt == 255 || sharpTAmt == 255 ||
-    //      sharpWPos == 255 || sharpTPos == 255) {
-    sharpWAmt = 0;
-    sharpTAmt = 0;
-    sharpWPos = 0;
-    sharpTPos = 0;
-  }
-
-  if (sharpTPos == 255 && sharpWPos != 255) {
-    sharpTPos = sharpWPos;
-    sharpTAmt = sharpWAmt;
-  }
-
-  if (sharpTPos != 255 && sharpWPos == 255) {
-    sharpWPos = sharpTPos;
-    sharpWAmt = sharpTAmt;
-  }
-
-  if (brightStart >= 255) brightAmt = 0;
-  if (darkStart <= 0)   darkAmt = 0;
 
   //  if (pf1 != NULL && ((pf1_width != src_width) || (pf1_height != src_height)))// {
   //    env->ThrowError("pf1 size != Src size");

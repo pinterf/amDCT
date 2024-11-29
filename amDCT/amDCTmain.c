@@ -233,8 +233,6 @@ int   amDCTmain(
     return(0);   // No memory allocated yet, so just return;
   }
 
-
-
   if (brightStart >= 255) brightAmt = 0;
   if (brightAmt <= 0)   brightStart = 255;  // If we comment this out we can use this to provide hints for extra smoothing. This would need to be changed in amDCT.cpp as well.
 
@@ -243,6 +241,7 @@ int   amDCTmain(
   if (darkAmt <= 0)   darkStart = 0;
 
 
+  // -- !! The same parameter checking and conversion is done both in filter constructor and the actual main processing
 
   // Set the default sharpWPos and sharpTPos if only sharpWAmt or sharpTAmt is specified.
   if (sharpWPos == 255 && sharpTPos != 255) sharpWPos = sharpTPos;
@@ -251,8 +250,6 @@ int   amDCTmain(
   // If neither sharpWPos or sharpTPos have been set then use their defaults.
   if (sharpWPos == 255 && sharpTPos == 255 && sharpWAmt != 255)  sharpWPos = 5;
   if (sharpWPos == 255 && sharpTPos == 255 && sharpTAmt != 255)  sharpTPos = 7;
-
-
 
   if (sharpWAmt == 255 && sharpTAmt != 255) sharpWAmt = sharpTAmt;
   if (sharpTAmt == 255 && sharpWAmt != 255) sharpTAmt = sharpWAmt;
@@ -275,6 +272,7 @@ int   amDCTmain(
     sharpWPos = sharpTPos;
     sharpWAmt = sharpTAmt;
   }
+  // --- !! End of similarity
 
 
   // Currently sharpWAmt and sharpTAmt need to be <= 30.     BUG SHOULD WORK AT <= 31  !!!!!!
