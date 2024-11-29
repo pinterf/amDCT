@@ -54,8 +54,8 @@ amDCT::amDCT(PClip _child, PClip _pf1, PClip _bf1, const int _quant, const int _
   try { env->CheckVersion(8); }
   catch (const AvisynthError&) { has_at_least_v8 = false; }
 
-  if (!vi.IsYV12()) // is input planar?
-    env->ThrowError("amDCT: input to filter must be in YV12");
+  if (!((vi.IsYUV() || vi.IsYUVA()) && vi.IsPlanar() && vi.BitsPerComponent() == 8))
+    env->ThrowError("amDCT: input must be 8-bit Y or YUV format.");
 
   if ((quant < 0) || (quant > 31)) // was 31
     env->ThrowError("amDCT: quant out of range (0-31)");
@@ -225,86 +225,69 @@ PVideoFrame __stdcall amDCT::GetFrame(int n, IScriptEnvironment* env) {
   //    return src;
   //    }
 
-  if (vi.IsYV12()) {
-
-    //////// AviSynth sample code comment
-    // This code deals with YV12 colourspace where the Y, U and V information are
-    // stored in completely separate memory areas
-    //
-    // This colourspace is the most memory efficient but usually requires 3 separate loops
-    // However, it can actually be easier to deal with than YUY2 depending on your filter algorithm
-    //
-    //for (h=0; h < src_height;h++) {       // Loop from top line to bottom line (Sames as YUY2.
-    //  for (w = 0; w < src_width; w++)     // Loop from left side of the image to the right side.
-    //    *(dstp + w) = *(srcp + w);      // Copy each byte from source to destination.
-    //  srcp = srcp + src_pitch;            // Add the pitch (note use of pitch and not width) of one line (in bytes) to the source image.
-    //  dstp = dstp + dst_pitch;            // Add the pitch of one line (in bytes) to the destination.
-    //}
-    //////// end AviSynth sample code comment
+  // planar YUV is guaranteed here
 
   // So first of all deal with the Y Plane
-    srcp = src->GetReadPtr();
-    dstp = dst->GetWritePtr();
+  srcp = src->GetReadPtr();
+  dstp = dst->GetWritePtr();
 
-    unsigned int   height = src_height;
-    unsigned int   width = src_width;
-    /*
-    //      FUTURE TRY MULTIPLE MOTION COMPENSATED FRAMES from MVTools2
-        unsigned char       *pf1Buf  = NULL;
-        unsigned char       *pf1Bufp = NULL;
-        unsigned char       *ppf1    = NULL;
+  unsigned int   height = src_height;
+  unsigned int   width = src_width;
+  /*
+  //      FUTURE TRY MULTIPLE MOTION COMPENSATED FRAMES from MVTools2
+      unsigned char       *pf1Buf  = NULL;
+      unsigned char       *pf1Bufp = NULL;
+      unsigned char       *ppf1    = NULL;
 
-        unsigned char       *bf1Buf  = NULL;
-        unsigned char       *bf1Bufp = NULL;
-        unsigned char       *pbf1    = NULL;
-        if (pf1 != NULL) {
-          pf1Buf  = (unsigned char *)_aligned_malloc(frameSize, ALIGN);
-          pf1Bufp = pf1Buf;
-          ppf1    = pf1Bufp;
-          memset(pf1Buf,  0, frameSize);
-        }
+      unsigned char       *bf1Buf  = NULL;
+      unsigned char       *bf1Bufp = NULL;
+      unsigned char       *pbf1    = NULL;
+      if (pf1 != NULL) {
+        pf1Buf  = (unsigned char *)_aligned_malloc(frameSize, ALIGN);
+        pf1Bufp = pf1Buf;
+        ppf1    = pf1Bufp;
+        memset(pf1Buf,  0, frameSize);
+      }
 
-        if (bf1 != NULL) {
-          bf1Buf  = (unsigned char *)_aligned_malloc(frameSize, ALIGN);
-          bf1Bufp = bf1Buf;
-          pbf1    = bf1Bufp;
-          memset(bf1Buf,  0, frameSize);
-        }
-    */
+      if (bf1 != NULL) {
+        bf1Buf  = (unsigned char *)_aligned_malloc(frameSize, ALIGN);
+        bf1Bufp = bf1Buf;
+        pbf1    = bf1Bufp;
+        memset(bf1Buf,  0, frameSize);
+      }
+  */
 
-    unsigned char* psrc = (unsigned char*)srcp;
-    height = src_height;
-    width = src_width;
+  unsigned char* psrc = (unsigned char*)srcp;
+  height = src_height;
+  width = src_width;
 
-    //    ppf1 = pf1Bufp;  // For testing the use of motion compensated frames.
-    //    pbf1 = bf1Bufp;
-        //if (aaDCT(psrc, ppf1, pbf1, dstp, height, width, dst_height, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, showMask, T2, ncpu) > 0) {
-    if (amDCTmain(psrc, dstp, height, width, src_pitch, dst_height, dst_width, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, darkStart, darkAmt, showMask, T2, ncpu) == 1) {
-      env->ThrowError("amDCT: out of memory");
-    }
-
-    // end of Y plane Code
-
-    // Copy U and V planes
-    const unsigned int dst_pitchUV = dst->GetPitch(PLANAR_U);   // The pitch,height and width information
-    const unsigned int src_pitchUV = src->GetPitch(PLANAR_U);   // plane values and use them for V as
-    const unsigned int src_widthUV = src->GetRowSize(PLANAR_U); // well
-    const unsigned int src_heightUV = src->GetHeight(PLANAR_U);   //
-    // no problem if Y only
-    env->BitBlt(dst->GetWritePtr(PLANAR_U), dst_pitchUV, src->GetReadPtr(PLANAR_U), src_pitchUV, src_widthUV, src_heightUV);
-    env->BitBlt(dst->GetWritePtr(PLANAR_V), dst_pitchUV, src->GetReadPtr(PLANAR_V), src_pitchUV, src_widthUV, src_heightUV);
-    // and Alpha if Any
-    if (vi.IsPlanarRGBA() || vi.IsYUVA()) {
-      env->BitBlt(dst->GetWritePtr(PLANAR_A), dst->GetPitch(PLANAR_A), src->GetReadPtr(PLANAR_A),
-        src->GetPitch(PLANAR_A), src->GetRowSize(PLANAR_A), src->GetHeight(PLANAR_A));
-    }
-
-//  if (pf1 != NULL) _aligned_free(pf1Buf);
-//  if (bf1 != NULL) _aligned_free(bf1Buf);
-
+  //    ppf1 = pf1Bufp;  // For testing the use of motion compensated frames.
+  //    pbf1 = bf1Bufp;
+      //if (aaDCT(psrc, ppf1, pbf1, dstp, height, width, dst_height, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, showMask, T2, ncpu) > 0) {
+  if (amDCTmain(psrc, dstp, height, width, src_pitch, dst_height, dst_width, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, darkStart, darkAmt, showMask, T2, ncpu) == 1) {
+    env->ThrowError("amDCT: out of memory");
   }
 
-  // As we now are finished processing the image, we return the destination image.
+  // end of Y plane Code
+
+  // Copy U and V planes
+  const unsigned int dst_pitchUV = dst->GetPitch(PLANAR_U);   // The pitch,height and width information
+  const unsigned int src_pitchUV = src->GetPitch(PLANAR_U);   // plane values and use them for V as
+  const unsigned int src_widthUV = src->GetRowSize(PLANAR_U); // well
+  const unsigned int src_heightUV = src->GetHeight(PLANAR_U);   //
+  // no problem if Y only
+  env->BitBlt(dst->GetWritePtr(PLANAR_U), dst_pitchUV, src->GetReadPtr(PLANAR_U), src_pitchUV, src_widthUV, src_heightUV);
+  env->BitBlt(dst->GetWritePtr(PLANAR_V), dst_pitchUV, src->GetReadPtr(PLANAR_V), src_pitchUV, src_widthUV, src_heightUV);
+  // and Alpha if Any
+  if (vi.IsPlanarRGBA() || vi.IsYUVA()) {
+    env->BitBlt(dst->GetWritePtr(PLANAR_A), dst->GetPitch(PLANAR_A), src->GetReadPtr(PLANAR_A),
+      src->GetPitch(PLANAR_A), src->GetRowSize(PLANAR_A), src->GetHeight(PLANAR_A));
+  }
+
+  //  if (pf1 != NULL) _aligned_free(pf1Buf);
+  //  if (bf1 != NULL) _aligned_free(bf1Buf);
+
+    // As we now are finished processing the image, we return the destination image.
   return dst;
 }
 
