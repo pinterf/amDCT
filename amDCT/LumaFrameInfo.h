@@ -3,7 +3,7 @@
 
 #include "amDCTtypedefs.h"
 
-void  LumaFrameInfo(FrameInfo_args *FrameInfoArgs);
+void  LumaFrameInfo(FrameInfo_args* FrameInfoArgs);
 
 
 #endif // _LUMAFRAMEINFO_H_

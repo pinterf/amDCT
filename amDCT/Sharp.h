@@ -3,6 +3,6 @@
 
 #include "amDCTtypedefs.h"
 
-int  Sharp(FrameInfo_args *FrameInfoArgs, int noRun);
+int  Sharp(FrameInfo_args* FrameInfoArgs, int noRun);
 
 #endif // _SHARP_H_

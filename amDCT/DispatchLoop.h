@@ -6,6 +6,6 @@
 
 #include "DctLoop.h"
 
-int   DispatchLoop(FrameInfo_args *FrameInfoArgs);
+int   DispatchLoop(FrameInfo_args* FrameInfoArgs);
 
 #endif _DISPATCHLOOP_H_

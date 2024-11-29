@@ -8,11 +8,11 @@
 
 #include "amDCTtypedefs.h"
 
-//void 	boxBlur(        FrameInfo_args *FrameInfoArgs, uint8_t radius);
-//void	gaussianBlur(   FrameInfo_args *FrameInfoArgs, uint8_t radius); 
-//void	gaussianBlur2(  FrameInfo_args *FrameInfoArgs, uint8_t radius); 
-void	gaussianBlur(   FrameInfo_args *FrameInfoArgs, uint8_t radiusX, uint8_t radiusY); 
-void    gaussianBlur2(  FrameInfo_args *FrameInfoArgs, uint8_t *src, uint8_t *dst, uint8_t radiusX, uint8_t radiusY, uint8_t strength); 
+//void   boxBlur(        FrameInfo_args *FrameInfoArgs, uint8_t radius);
+//void  gaussianBlur(   FrameInfo_args *FrameInfoArgs, uint8_t radius); 
+//void  gaussianBlur2(  FrameInfo_args *FrameInfoArgs, uint8_t radius); 
+void  gaussianBlur(FrameInfo_args* FrameInfoArgs, uint8_t radiusX, uint8_t radiusY);
+void    gaussianBlur2(FrameInfo_args* FrameInfoArgs, uint8_t* src, uint8_t* dst, uint8_t radiusX, uint8_t radiusY, uint8_t strength);
 //void    LumaFrameMedian(FrameInfo_args *FrameInfoArgs, uint8_t *src, uint8_t *dst, uint8_t radius);
 //void ctmf(
 //        const unsigned char* const src, unsigned char* const dst,
@@ -20,7 +20,7 @@ void    gaussianBlur2(  FrameInfo_args *FrameInfoArgs, uint8_t *src, uint8_t *ds
 //        const int src_step, const int dst_step,
 //        const int r, const int cn, const long unsigned int memsize
 //        );
-        
+
 /*
  *      NOTE: LumaFrameMedian() Provides an interface to ctmf.c - Constant-time median filtering which has the copyright listed below.
  *

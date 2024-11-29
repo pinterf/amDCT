@@ -7,10 +7,10 @@
 #include "amDCTtypedefs.h"
 
 
-void  maxFrame(FrameInfo_args *FrameInfoArgs, uint8_t *src, uint8_t *dst, uint8_t radiusX, uint8_t radiusY);
-void  minFrame(FrameInfo_args *FrameInfoArgs, uint8_t *src, uint8_t *dst, uint8_t radiusX, uint8_t radiusY);
+void  maxFrame(FrameInfo_args* FrameInfoArgs, uint8_t* src, uint8_t* dst, uint8_t radiusX, uint8_t radiusY);
+void  minFrame(FrameInfo_args* FrameInfoArgs, uint8_t* src, uint8_t* dst, uint8_t radiusX, uint8_t radiusY);
 
-void sadWindow(FrameInfo_args *FrameInfoArgs, uint8_t *src, uint8_t *dst, uint8_t *mean, uint8_t radiusX, uint8_t radiusY); 
+void sadWindow(FrameInfo_args* FrameInfoArgs, uint8_t* src, uint8_t* dst, uint8_t* mean, uint8_t radiusX, uint8_t radiusY);
 
 
 

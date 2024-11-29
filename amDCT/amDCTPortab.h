@@ -4,35 +4,35 @@
 
 
 #ifndef  FALSE
-	#define FALSE    0
+#define FALSE    0
 #endif
 #ifndef  TRUE
-	#define TRUE     1
+#define TRUE     1
 #endif
 
 
 
 #ifndef NULL
-  #ifdef __cplusplus
-	#define NULL  0
-  #else
-	#define NULL  ((void *)0)
-  #endif
+#ifdef __cplusplus
+#define NULL  0
+#else
+#define NULL  ((void *)0)
+#endif
 #endif
 
 
 #ifndef ROUND_TOINT
-  #define ROUND_TOINT(X)  (int)(((X > 0.0)?(X + 0.5):(X - 0.5)))
+#define ROUND_TOINT(X)  (int)(((X > 0.0)?(X + 0.5):(X - 0.5)))
 #endif
 
 #ifndef ROUND_TO_CURVAL
-  #define ROUND_TO_CURVAL(CURV, X)  (int)(((X > CURV)?(X - 0.5):(X + 0.5)))
+#define ROUND_TO_CURVAL(CURV, X)  (int)(((X > CURV)?(X - 0.5):(X + 0.5)))
 #endif
 
 
 // Macroes from xvid global.h  file
 #ifndef MIN
-	#define MIN(X, Y) ((X)<(Y)?(X):(Y))
+#define MIN(X, Y) ((X)<(Y)?(X):(Y))
 #endif
 
 #ifndef MAX

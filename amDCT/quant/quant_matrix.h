@@ -27,25 +27,25 @@
 #ifndef _QUANT_MATRIX_H_
 #define _QUANT_MATRIX_H_
 
-//#include "../portab.h"
-#include <stdint.h>	
+ //#include "../portab.h"
+#include <stdint.h>  
 
 #define SCALEBITS 17
 
-void init_mpeg_matrix(uint16_t * mpeg_quant_matrices);
+void init_mpeg_matrix(uint16_t* mpeg_quant_matrices);
 
-int is_custom_intra_matrix(const uint16_t * mpeg_quant_matrices);
-int is_custom_inter_matrix(const uint16_t * mpeg_quant_matrices);
+int is_custom_intra_matrix(const uint16_t* mpeg_quant_matrices);
+int is_custom_inter_matrix(const uint16_t* mpeg_quant_matrices);
 
-void set_intra_matrix(uint16_t *mpeg_quant_matrices, const uint8_t * matrix);
-void set_inter_matrix(uint16_t *mpeg_quant_matrices, const uint8_t * matrix);
+void set_intra_matrix(uint16_t* mpeg_quant_matrices, const uint8_t* matrix);
+void set_inter_matrix(uint16_t* mpeg_quant_matrices, const uint8_t* matrix);
 
-void init_intra_matrix(uint16_t * mpeg_quant_matrices, uint32_t quant);
+void init_intra_matrix(uint16_t* mpeg_quant_matrices, uint32_t quant);
 
-const uint16_t *get_intra_matrix(const uint16_t *mpeg_quant_matrices);
-const uint16_t *get_inter_matrix(const uint16_t *mpeg_quant_matrices);
+const uint16_t* get_intra_matrix(const uint16_t* mpeg_quant_matrices);
+const uint16_t* get_inter_matrix(const uint16_t* mpeg_quant_matrices);
 
-const uint8_t *get_default_intra_matrix(void);
-const uint8_t *get_default_inter_matrix(void);
+const uint8_t* get_default_intra_matrix(void);
+const uint8_t* get_default_inter_matrix(void);
 
-#endif							/* _QUANT_MATRIX_H_ */
+#endif              /* _QUANT_MATRIX_H_ */

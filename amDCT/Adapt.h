@@ -3,6 +3,6 @@
 
 #include "amDCTtypedefs.h"
 
-int  doAdapt(FrameInfo_args *FrameInfoArgs);
+int  doAdapt(FrameInfo_args* FrameInfoArgs);
 
 #endif // _ADAPT_H_

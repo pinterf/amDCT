@@ -48,7 +48,7 @@
  *
  ********************************************************/
 
-#include <stdint.h>	
+#include <stdint.h>  
 
 #include "fdct.h"
 

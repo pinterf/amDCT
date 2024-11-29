@@ -6,14 +6,14 @@
 #include "BuildPreCompVals.h" 
 
 
-uint8_t        avgDctLoopAccumDCT(FrameInfo_args *FrameInfoArgs);
-uint8_t           avgDctLoopAccum(FrameInfo_args *FrameInfoArgs);
-uint8_t   avgDctLoopAccumSmoothed(FrameInfo_args *FrameInfoArgs);
-uint8_t      avgDctLoopAccumSharp(FrameInfo_args *FrameInfoArgs);
+uint8_t        avgDctLoopAccumDCT(FrameInfo_args* FrameInfoArgs);
+uint8_t           avgDctLoopAccum(FrameInfo_args* FrameInfoArgs);
+uint8_t   avgDctLoopAccumSmoothed(FrameInfo_args* FrameInfoArgs);
+uint8_t      avgDctLoopAccumSharp(FrameInfo_args* FrameInfoArgs);
 
-//uint8_t	  justBrightSmoothed(FrameInfo_args *FrameInfoArgs);
+//uint8_t    justBrightSmoothed(FrameInfo_args *FrameInfoArgs);
 
-//uint8_t	  doDeringDarkProtect(FrameInfo_args *FrameInfoArgs);
+//uint8_t    doDeringDarkProtect(FrameInfo_args *FrameInfoArgs);
 
 
 

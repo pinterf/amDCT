@@ -3,7 +3,7 @@
 
 #include "amDCTtypedefs.h"
 
-void  buildPerBlockMatrix(FrameInfo_args *FrameInfoArgs);
+void  buildPerBlockMatrix(FrameInfo_args* FrameInfoArgs);
 
 #endif // _BUILDPERBLOCKMATRIX_H_
 

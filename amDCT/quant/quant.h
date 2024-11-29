@@ -26,20 +26,20 @@
 #ifndef _QUANT_H_
 #define _QUANT_H_
 
-//#include "../portab.h"
-#include <stdint.h>	
+ //#include "../portab.h"
+#include <stdint.h>  
 
 /*****************************************************************************
  * Common API for Intra (de)Quant functions
  ****************************************************************************/
 
-typedef uint32_t (quant_intraFunc) (int16_t * coeff,
-									const int16_t * data,
-									const uint32_t quant,
-									const uint32_t dcscalar,
-									const uint16_t * mpeg_quant_matrices);
+typedef uint32_t(quant_intraFunc) (int16_t* coeff,
+  const int16_t* data,
+  const uint32_t quant,
+  const uint32_t dcscalar,
+  const uint16_t* mpeg_quant_matrices);
 
-typedef quant_intraFunc *quant_intraFuncPtr;
+typedef quant_intraFunc* quant_intraFuncPtr;
 
 /* Global function pointers */
 extern quant_intraFuncPtr quant_h263_intra;
@@ -51,7 +51,7 @@ extern quant_intraFuncPtr dequant_mpeg_intra;
  * Known implementation of Intra (de)Quant functions
  ****************************************************************************/
 
-/* Quant functions */
+ /* Quant functions */
 quant_intraFunc quant_h263_intra_c;
 quant_intraFunc quant_mpeg_intra_c;
 
@@ -98,12 +98,12 @@ quant_intraFunc dequant_mpeg_intra_altivec_c;
  * Common API for Inter (de)Quant functions
  ****************************************************************************/
 
-typedef uint32_t (quant_interFunc) (int16_t * coeff,
-									const int16_t * data,
-									const uint32_t quant,
-									const uint16_t * mpeg_quant_matrices);
+typedef uint32_t(quant_interFunc) (int16_t* coeff,
+  const int16_t* data,
+  const uint32_t quant,
+  const uint16_t* mpeg_quant_matrices);
 
-typedef quant_interFunc *quant_interFuncPtr;
+typedef quant_interFunc* quant_interFuncPtr;
 
 /* Global function pointers */
 extern quant_interFuncPtr quant_h263_inter;

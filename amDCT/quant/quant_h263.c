@@ -23,8 +23,8 @@
  *
  ****************************************************************************/
 
-//#include "../global.h"  // Only need DIV_DIV 
-// Copied DIV_DIV from xvid global.h file
+ //#include "../global.h"  // Only need DIV_DIV 
+ // Copied DIV_DIV from xvid global.h file
 #define DIV_DIV(a,b)    (((a)>0) ? ((a)+((b)>>1))/(b) : ((a)-((b)>>1))/(b))
 #include "quant.h"
 
@@ -33,7 +33,7 @@
  * Global function pointers
  ****************************************************************************/
 
-/* Quant */
+ /* Quant */
 quant_intraFuncPtr quant_h263_intra;
 quant_interFuncPtr quant_h263_inter;
 
@@ -45,152 +45,157 @@ quant_interFuncPtr dequant_h263_inter;
  * Local data
  ****************************************************************************/
 
-/* divide-by-multiply table
- * a 16 bit shiting is enough in this case */
+ /* divide-by-multiply table
+  * a 16 bit shiting is enough in this case */
 
-#define SCALEBITS	16
-#define FIX(X)		((1L << SCALEBITS) / (X) + 1)
+#define SCALEBITS  16
+#define FIX(X)    ((1L << SCALEBITS) / (X) + 1)
 
 static const uint32_t multipliers[32] =
 {
-	0,       FIX(2),  FIX(4),  FIX(6),
-	FIX(8),  FIX(10), FIX(12), FIX(14),
-	FIX(16), FIX(18), FIX(20), FIX(22),
-	FIX(24), FIX(26), FIX(28), FIX(30),
-	FIX(32), FIX(34), FIX(36), FIX(38),
-	FIX(40), FIX(42), FIX(44), FIX(46),
-	FIX(48), FIX(50), FIX(52), FIX(54),
-	FIX(56), FIX(58), FIX(60), FIX(62)
+  0,       FIX(2),  FIX(4),  FIX(6),
+  FIX(8),  FIX(10), FIX(12), FIX(14),
+  FIX(16), FIX(18), FIX(20), FIX(22),
+  FIX(24), FIX(26), FIX(28), FIX(30),
+  FIX(32), FIX(34), FIX(36), FIX(38),
+  FIX(40), FIX(42), FIX(44), FIX(46),
+  FIX(48), FIX(50), FIX(52), FIX(54),
+  FIX(56), FIX(58), FIX(60), FIX(62)
 };
 
 /*****************************************************************************
  * Function definitions
  ****************************************************************************/
 
-/*	quantize intra-block
- */
+ /*  quantize intra-block
+  */
 
 uint32_t
-quant_h263_intra_c(int16_t * coeff,
-				   const int16_t * data,
-				   const uint32_t quant,
-				   const uint32_t dcscalar,
-				   const uint16_t * mpeg_quant_matrices)
+quant_h263_intra_c(int16_t* coeff,
+  const int16_t* data,
+  const uint32_t quant,
+  const uint32_t dcscalar,
+  const uint16_t* mpeg_quant_matrices)
 {
-	const uint32_t mult = multipliers[quant];
-	const uint16_t quant_m_2 = (uint16_t)(quant << 1);
-	int i;
-mpeg_quant_matrices;  // disable Microsoft lint warning. 
+  const uint32_t mult = multipliers[quant];
+  const uint16_t quant_m_2 = (uint16_t)(quant << 1);
+  int i;
+  mpeg_quant_matrices;  // disable Microsoft lint warning. 
 
-	coeff[0] = (int16_t)DIV_DIV(data[0], (int32_t) dcscalar);
+  coeff[0] = (int16_t)DIV_DIV(data[0], (int32_t)dcscalar);
 
-	for (i = 1; i < 64; i++) {
-		int16_t acLevel = data[i];
+  for (i = 1; i < 64; i++) {
+    int16_t acLevel = data[i];
 
-		if (acLevel < 0) {
-			acLevel = -acLevel;
-			if (acLevel < quant_m_2) {
-				coeff[i] = 0;
-				continue;
-			}
-			acLevel = (acLevel * mult) >> SCALEBITS;
-			coeff[i] = -acLevel;
-		} else {
-			if (acLevel < quant_m_2) {
-				coeff[i] = 0;
-				continue;
-			}
-			acLevel = (acLevel * mult) >> SCALEBITS;
-			coeff[i] = acLevel;
-		}
-	}
+    if (acLevel < 0) {
+      acLevel = -acLevel;
+      if (acLevel < quant_m_2) {
+        coeff[i] = 0;
+        continue;
+      }
+      acLevel = (acLevel * mult) >> SCALEBITS;
+      coeff[i] = -acLevel;
+    }
+    else {
+      if (acLevel < quant_m_2) {
+        coeff[i] = 0;
+        continue;
+      }
+      acLevel = (acLevel * mult) >> SCALEBITS;
+      coeff[i] = acLevel;
+    }
+  }
 
-	return(0);
+  return(0);
 }
 
 
-/*	quantize inter-block
+/*  quantize inter-block
  */
 
 uint32_t
-quant_h263_inter_c(int16_t * coeff,
-				   const int16_t * data,
-				   const uint32_t quant,
-				   const uint16_t * mpeg_quant_matrices)
+quant_h263_inter_c(int16_t* coeff,
+  const int16_t* data,
+  const uint32_t quant,
+  const uint16_t* mpeg_quant_matrices)
 {
-	const uint32_t mult = multipliers[quant];
-	const uint16_t quant_m_2 = (uint16_t)(quant << 1);
-	const uint16_t quant_d_2 = (uint16_t)(quant >> 1);
-	uint32_t sum = 0;
-	uint32_t i;
-mpeg_quant_matrices;  // disable Microsoft lint warning. 
+  const uint32_t mult = multipliers[quant];
+  const uint16_t quant_m_2 = (uint16_t)(quant << 1);
+  const uint16_t quant_d_2 = (uint16_t)(quant >> 1);
+  uint32_t sum = 0;
+  uint32_t i;
+  mpeg_quant_matrices;  // disable Microsoft lint warning. 
 
-	for (i = 0; i < 64; i++) {
-		int16_t acLevel = data[i];
+  for (i = 0; i < 64; i++) {
+    int16_t acLevel = data[i];
 
-		if (acLevel < 0) {
-			acLevel = (-acLevel) - quant_d_2;
-			if (acLevel < quant_m_2) {
-				coeff[i] = 0;
-				continue;
-			}
+    if (acLevel < 0) {
+      acLevel = (-acLevel) - quant_d_2;
+      if (acLevel < quant_m_2) {
+        coeff[i] = 0;
+        continue;
+      }
 
-			acLevel = (acLevel * mult) >> SCALEBITS;
-			sum += acLevel;		/* sum += |acLevel| */
-			coeff[i] = -acLevel;
-		} else {
-			acLevel -= quant_d_2;
-			if (acLevel < quant_m_2) {
-				coeff[i] = 0;
-				continue;
-			}
-			acLevel = (acLevel * mult) >> SCALEBITS;
-			sum += acLevel;
-			coeff[i] = acLevel;
-		}
-	}
+      acLevel = (acLevel * mult) >> SCALEBITS;
+      sum += acLevel;    /* sum += |acLevel| */
+      coeff[i] = -acLevel;
+    }
+    else {
+      acLevel -= quant_d_2;
+      if (acLevel < quant_m_2) {
+        coeff[i] = 0;
+        continue;
+      }
+      acLevel = (acLevel * mult) >> SCALEBITS;
+      sum += acLevel;
+      coeff[i] = acLevel;
+    }
+  }
 
-	return(sum);
+  return(sum);
 }
 
 
-/*	dequantize intra-block & clamp to [-2048,2047]
+/*  dequantize intra-block & clamp to [-2048,2047]
  */
 
 uint32_t
-dequant_h263_intra_c(int16_t * data,
-					 const int16_t * coeff,
-					 const uint32_t quant,
-					 const uint32_t dcscalar,
-					 const uint16_t * mpeg_quant_matrices)
+dequant_h263_intra_c(int16_t* data,
+  const int16_t* coeff,
+  const uint32_t quant,
+  const uint32_t dcscalar,
+  const uint16_t* mpeg_quant_matrices)
 {
-	const int32_t quant_m_2 = quant << 1;
-	const int32_t quant_add = (quant & 1 ? quant : quant - 1);
-	int i;
-mpeg_quant_matrices;  // disable Microsoft lint warning. 
+  const int32_t quant_m_2 = quant << 1;
+  const int32_t quant_add = (quant & 1 ? quant : quant - 1);
+  int i;
+  mpeg_quant_matrices;  // disable Microsoft lint warning. 
 
-	data[0] = (int16_t)(coeff[0] * dcscalar);
-	if (data[0] < -2048) {
-		data[0] = -2048;
-	} else if (data[0] > 2047) {
-		data[0] = 2047;
-	}
+  data[0] = (int16_t)(coeff[0] * dcscalar);
+  if (data[0] < -2048) {
+    data[0] = -2048;
+  }
+  else if (data[0] > 2047) {
+    data[0] = 2047;
+  }
 
-	for (i = 1; i < 64; i++) {
-		int32_t acLevel = coeff[i];
+  for (i = 1; i < 64; i++) {
+    int32_t acLevel = coeff[i];
 
-		if (acLevel == 0) {
-			data[i] = 0;
-		} else if (acLevel < 0) {
-			acLevel = quant_m_2 * -acLevel + quant_add;
-			data[i] = (int16_t)(acLevel <= 2048 ? -acLevel : -2048);
-		} else {
-			acLevel = quant_m_2 * acLevel + quant_add;
-			data[i] = (uint16_t)(acLevel <= 2047 ? acLevel : 2047);
-		}
-	}
+    if (acLevel == 0) {
+      data[i] = 0;
+    }
+    else if (acLevel < 0) {
+      acLevel = quant_m_2 * -acLevel + quant_add;
+      data[i] = (int16_t)(acLevel <= 2048 ? -acLevel : -2048);
+    }
+    else {
+      acLevel = quant_m_2 * acLevel + quant_add;
+      data[i] = (uint16_t)(acLevel <= 2047 ? acLevel : 2047);
+    }
+  }
 
-	return(0);
+  return(0);
 }
 
 
@@ -199,29 +204,31 @@ mpeg_quant_matrices;  // disable Microsoft lint warning.
  */
 
 uint32_t
-dequant_h263_inter_c(int16_t * data,
-					 const int16_t * coeff,
-					 const uint32_t quant,
-					 const uint16_t * mpeg_quant_matrices)
+dequant_h263_inter_c(int16_t* data,
+  const int16_t* coeff,
+  const uint32_t quant,
+  const uint16_t* mpeg_quant_matrices)
 {
-	const uint16_t quant_m_2 = (uint16_t)(quant << 1);
-	const uint16_t quant_add = (uint16_t)(quant & 1 ? quant : quant - 1);
-	int i;
-mpeg_quant_matrices;  // disable Microsoft lint warning. 
+  const uint16_t quant_m_2 = (uint16_t)(quant << 1);
+  const uint16_t quant_add = (uint16_t)(quant & 1 ? quant : quant - 1);
+  int i;
+  mpeg_quant_matrices;  // disable Microsoft lint warning. 
 
-	for (i = 0; i < 64; i++) {
-		int16_t acLevel = coeff[i];
+  for (i = 0; i < 64; i++) {
+    int16_t acLevel = coeff[i];
 
-		if (acLevel == 0) {
-			data[i] = 0;
-		} else if (acLevel < 0) {
-			acLevel = acLevel * quant_m_2 - quant_add;
-			data[i] = (acLevel >= -2048 ? acLevel : -2048);
-		} else {
-			acLevel = acLevel * quant_m_2 + quant_add;
-			data[i] = (acLevel <= 2047 ? acLevel : 2047);
-		}
-	}
+    if (acLevel == 0) {
+      data[i] = 0;
+    }
+    else if (acLevel < 0) {
+      acLevel = acLevel * quant_m_2 - quant_add;
+      data[i] = (acLevel >= -2048 ? acLevel : -2048);
+    }
+    else {
+      acLevel = acLevel * quant_m_2 + quant_add;
+      data[i] = (acLevel <= 2047 ? acLevel : 2047);
+    }
+  }
 
-	return(0);
+  return(0);
 }

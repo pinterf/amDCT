@@ -47,4 +47,4 @@ fdctFunc fdct_sse2_skal;
 fdctFunc fdct_ia64;
 #endif
 
-#endif							/* _FDCT_H_ */
+#endif              /* _FDCT_H_ */
