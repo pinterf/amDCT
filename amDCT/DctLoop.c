@@ -649,35 +649,20 @@ void quantDequant_expandRange(
 
 #ifdef USE_NEW_INTRINSICS
 __forceinline void copy_add_16to16_clpsrc_xmm(uint16_t* dst, int16_t* const src, int32_t stride) {
-  __m128i lowB = _mm_set1_epi16(0x00ff); // Assuming lowB is a constant value
-  __m128i zero = _mm_setzero_si128();
 
-  for (int i = 0; i < 8; ++i) {
-    __m128i src0 = _mm_load_si128((__m128i*)(src + i * stride));
-    __m128i dst0 = _mm_loadu_si128((__m128i*)(dst + i * stride));
+	__m128i zero = _mm_setzero_si128();
+	__m128i max_val = _mm_set1_epi16(255);
 
-    __m128i src1 = _mm_load_si128((__m128i*)(src + i * stride + 8));
-    __m128i dst1 = _mm_loadu_si128((__m128i*)(dst + i * stride + 8));
-
-    __m128i src2 = _mm_load_si128((__m128i*)(src + i * stride + 16));
-    __m128i dst2 = _mm_loadu_si128((__m128i*)(dst + i * stride + 16));
-
-    src0 = _mm_max_epi16(src0, zero);
-    src1 = _mm_max_epi16(src1, zero);
-    src2 = _mm_max_epi16(src2, zero);
-
-    src0 = _mm_min_epi16(src0, lowB);
-    src1 = _mm_min_epi16(src1, lowB);
-    src2 = _mm_min_epi16(src2, lowB);
-
-    __m128i result0 = _mm_adds_epi16(src0, dst0);
-    __m128i result1 = _mm_adds_epi16(src1, dst1);
-    __m128i result2 = _mm_adds_epi16(src2, dst2);
-
-    _mm_storeu_si128((__m128i*)(dst + i * stride), result0);
-    _mm_storeu_si128((__m128i*)(dst + i * stride + 8), result1);
-    _mm_storeu_si128((__m128i*)(dst + i * stride + 16), result2);
-  }
+	for (int y = 0; y < 8; y++) {
+		for (int x = 0; x < 8; x += 8) {
+			int pos = y * stride + x;
+			__m128i src_vals = _mm_loadu_si128((__m128i*)(src + y * 8 + x));
+			__m128i clamped_vals = _mm_max_epi16(zero, _mm_min_epi16(src_vals, max_val));
+			__m128i dst_vals = _mm_loadu_si128((__m128i*)(dst + pos));
+			dst_vals = _mm_add_epi16(dst_vals, clamped_vals);
+			_mm_storeu_si128((__m128i*)(dst + pos), dst_vals);
+		}
+	}
 }
 #else
 __forceinline void copy_add_16to16_clpsrc_xmm(uint16_t *dst,  int16_t * const src, int32_t stride) {
