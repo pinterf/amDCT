@@ -12,7 +12,7 @@
 #include "Sharp.h"
 #include "LumaFrameInfo.h"
 #include "LumaBlockInfo.h"
-#include "matrix.h"
+#include "Matrix.h"
 #include "DispatchLoop.h"
 
 #include "DctLoop.h"

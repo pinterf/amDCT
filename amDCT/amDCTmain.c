@@ -254,8 +254,8 @@ int   amDCTmain(
   if (sharpWAmt == 255 && sharpTAmt != 255) sharpWAmt = sharpTAmt;
   if (sharpTAmt == 255 && sharpWAmt != 255) sharpTAmt = sharpWAmt;
 
-  if (sharpWAmt == 255 && sharpTAmt == 255 ||
-    sharpWPos == 255 && sharpTPos == 255) {
+  if ((sharpWAmt == 255 && sharpTAmt == 255) ||
+    (sharpWPos == 255 && sharpTPos == 255)) {
 
     sharpWAmt = 0;
     sharpTAmt = 0;

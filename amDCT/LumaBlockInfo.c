@@ -190,10 +190,10 @@ void  LumaBlockInfo(FrameInfo_args* FrameInfoArgs) {
   //  // FUTURE ENHANCEMENT!  ANALYSE DCT VALUES FOR EACH BLOCK TO DETERMINE SPECIFIC CHANGES IN THE BLOCK
   //  // NOTE START OF CODE IS IN ROUTINE AT BOTTOM OF THE FILE!!!
   //  // Get the dct of the block and see if it is useful
-  //  __declspec(align(16)) int16_t    dct_block[64];
+  //  _Alignas(16) int16_t    dct_block[64];
   //
   //  // use pvalArr
-  //  transfer_8to16copy_xmm(dct_block, BF_workP, rowStride);
+  //  transfer_8to16copy(dct_block, BF_workP, rowStride);
   //  fdct_sse2_skal(dct_block);
   */
 
@@ -308,9 +308,8 @@ void  LumaBlockInfo(FrameInfo_args* FrameInfoArgs) {
 
             // At the start of an 8x8 block
 
-            if (((pixRowS == 0) || (pixRowS == 7)) && (pixColS >= 0) && (pixColS <= 7) ||
-              ((pixColS == 0) || (pixColS == 7)) && (pixRowS >= 0) && (pixRowS <= 7)) {
-
+            if (((pixRowS == 0 || pixRowS == 7) && pixColS >= 0 && pixColS <= 7) ||
+              ((pixColS == 0 || pixColS == 7) && pixRowS >= 0 && pixRowS <= 7)) {
               pval = puse[idxPixRC];
 
               // Do the edge of the 8x8 block
@@ -603,8 +602,8 @@ void  Get_DCTFrame(FrameInfo_args *FrameInfoArgs) {
 //  uint16_t  blkRow,  blkCol;
 //  int     stride = numBlocks_wide<<3;
 
-  __declspec(align(16)) int16_t   dct_block[MATRIX_SIZE];
-//  __declspec(align(16)) uint8_t   newMatrix[MATRIX_SIZE];
+  _Alignas(16) int16_t   dct_block[MATRIX_SIZE];
+//  _Alignas(16) uint8_t   newMatrix[MATRIX_SIZE];
 
 
 
@@ -863,7 +862,7 @@ static const int16_t iMask_Coeff[64] = {
 uint32_t get_coeff8_energy_c(FrameInfo_args* FrameInfoArgs, uint8_t* src, int startPix) {
   int     stride = FrameInfoArgs->numBlocks_wide << 3;
 
-  __declspec(align(16)) int16_t dct_block[64];
+  _Alignas(16) int16_t dct_block[64];
 
   src = src + startPix;
   transfer_8to16copy1_c(dct_block, src, stride);
@@ -902,21 +901,19 @@ coeff8_energy_c(const int16_t* dct)
 
 /*
  * SRC - the source buffer
- * DST - the destination buffer
+ * DST - the destination buffer, packed 8x8 int16_t array
  *
  * Then the function does the 8->16 bit transfer and this serie of operations :
  *
  *    SRC (8bit)  = SRC
  *    DST (16bit) = SRC
  */
-void
-transfer_8to16copy1_c(int16_t* const dst,
+void transfer_8to16copy1_c(int16_t* const dst,
   uint8_t* src,
   uint32_t stride)
 {
-  int i, j;
-  for (j = 0; j < 8; j++) {
-    for (i = 0; i < 8; i++) {
+  for (int j = 0; j < 8; j++) {
+    for (int i = 0; i < 8; i++) {
       dst[(j << 3) + i] = (int16_t)src[j * stride + i];
     }
   }

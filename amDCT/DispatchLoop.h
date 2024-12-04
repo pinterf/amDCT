@@ -8,4 +8,4 @@
 
 int   DispatchLoop(FrameInfo_args* FrameInfoArgs);
 
-#endif _DISPATCHLOOP_H_
+#endif // _DISPATCHLOOP_H_

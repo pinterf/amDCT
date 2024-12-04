@@ -107,7 +107,7 @@ void startDctLoop(FrameInfo_args* args) {
   case 3: {
     uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
     uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
-    copy_add3_16to16_xmm(BF_accumP, BF_accumPk1, BF_accumPk2, len);
+    copy_add3_16to16(BF_accumP, BF_accumPk1, BF_accumPk2, len);
     break;
   }
   case 4: {

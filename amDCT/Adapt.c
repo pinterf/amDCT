@@ -259,7 +259,6 @@ int doAdapt(FrameInfo_args* FrameInfoArgs) {
 
   // Now go through the collected block information and compute the frame as a whole information.
   for (i = 0; i < numBlks; i++) {
-    int temp;
 
     curBlock = i;
 
@@ -269,8 +268,6 @@ int doAdapt(FrameInfo_args* FrameInfoArgs) {
 
     if (blockPixCountUsed < 1) LumaPerBlockArgs[curBlock].adpt_PixPercent = 0;
     else                       LumaPerBlockArgs[curBlock].adpt_PixPercent = (uint8_t)(((blockPixCountUsed << 6 / blockPixCount)));
-
-    if (difBlockTotalUsed > blockPixCountUsed) temp = difBlockTotalUsed - blockPixCountUsed;
 
     //
     //    // THIS IS A TEST TO SEE IF WE CAN GET A BETTER PERCENT  NOT HELPING MUCH!!!!!!!!

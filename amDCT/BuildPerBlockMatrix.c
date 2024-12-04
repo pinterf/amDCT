@@ -57,8 +57,8 @@ void buildPerBlockMatrix(FrameInfo_args* FrameInfoArgs) {
   uint16_t  blkRow, blkCol;
   int     stride = numBlocks_wide << 3;
 
-  __declspec(align(16)) int16_t   dct_block[MATRIX_SIZE];
-  __declspec(align(16)) uint8_t   newMatrix[MATRIX_SIZE];
+  _Alignas(16) int16_t   dct_block[MATRIX_SIZE];
+  _Alignas(16) uint8_t   newMatrix[MATRIX_SIZE];
 
   // NOTE: Currently this just does the DCT and skips the quant-dequant as well as the IDCT
   //       A second mask could allow the quant-dequant processing, skip the IDCT processing and then return.
@@ -302,11 +302,11 @@ void buildPerBlockMatrix(FrameInfo_args* FrameInfoArgs) {
         //dct_blockOrig[0] = 8;
 
         dbzero = dct_block[0];
-        //quantDequant_xmm(dct_block, qtype1_matrix, qtype1_matrix_quant);
-        //quantDequant_xmm(dct_block, &dct_blockOrig[0], &dct_blockOrig[64]);
-        //quantDequant_xmm(dct_block, &dct_blockOrigMatrix[0], &dct_blockOrigMatrix[64]);
-        //quantDequant_xmm(dct_blockOrig, &dct_blockOrig[0], &dct_blockOrig[64]);
-        quantDequant_xmm(dct_block, matrix, matrix_quant);
+        //quantDequant(dct_block, qtype1_matrix, qtype1_matrix_quant);
+        //quantDequant(dct_block, &dct_blockOrig[0], &dct_blockOrig[64]);
+        //quantDequant(dct_block, &dct_blockOrigMatrix[0], &dct_blockOrigMatrix[64]);
+        //quantDequant(dct_blockOrig, &dct_blockOrig[0], &dct_blockOrig[64]);
+        quantDequant(dct_block, matrix, matrix_quant);
         dct_block[0] = dbzero;
 }
 

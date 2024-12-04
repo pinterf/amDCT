@@ -2,7 +2,7 @@
 
 #include "amDCTtypedefs.h"
 
-#include "matrix.h"
+#include "Matrix.h"
 #include "quant\quant_matrix.h"
 #include "Utilities.h"
 

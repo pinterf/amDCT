@@ -87,8 +87,6 @@ int deblock_vert_DC_on(uint8_t* v, int stride, int QP);
 void deblock_vert_default_filter_c(uint8_t* v, int stride, int QP);
 void deblock_vert_default_filter_ORIGINAL(uint8_t* v, int stride, int QP);
 
-const static uint64_t mm_fours = 0x0004000400040004;
-
 int deblock_vert_useDC(uint8_t* v, int stride, int moderate_v);
 
 void deblock_vert_choose_p1p2(uint8_t* v, int stride, uint64_t* p1p2, int QP);
@@ -781,7 +779,6 @@ void deblock_horiz_lpf9(uint8_t* v, int stride, int QP) {
 /* The 9-tap low pass filter used in "DC" regions */
 /* I'm not sure that I like this implementation any more...! */
 void deblock_horiz_lpf9_c(uint8_t* v, int stride, int QP) {
-  uint8_t temp[16];
   for (int y = 0; y < 4; y++) {
     // Calculate p1 and p2 based on QP threshold
     int p1 = (abs(v[0 + y * stride] - v[1 + y * stride]) < QP) ?
@@ -793,7 +790,6 @@ void deblock_horiz_lpf9_c(uint8_t* v, int stride, int QP) {
     uint8_t selfcheck[9];
     int psum;
     uint8_t* vv;
-    int i;
     /* put the result into temp buffer in selfcheck[9], 1-8 indexes go back to v[1..8] */
     /* low pass filtering (LPF9: 1 1 2 2 4 2 2 1 1) */
     vv = &(v[y * stride]);
@@ -1716,13 +1712,9 @@ void deblock_vert_choose_p1p2(uint8_t* v, int stride, uint64_t* p1p2, int QP)
 
 // like the checker code below
 void deblock_vert_copy_and_unpack_c(int stride, uint8_t* source, uint64_t* dest, int n) {
-  int j, k;
-  uint64_t* pmm1 = (uint64_t*)source;
-  uint64_t* pmm2 = (uint64_t*)dest;
-  int i = -n / 2;
-  for (k = 0; k < n; k++)
+  for (int k = 0; k < n; k++)
   {
-    for (j = 0; j < 8; j++)
+    for (int j = 0; j < 8; j++)
     {
       ((uint16_t*)dest)[k * 8 + j] = source[k * stride + j];
     }
@@ -1735,8 +1727,6 @@ void deblock_vert_copy_and_unpack_c(int stride, uint8_t* source, uint64_t* dest,
 /* n is the number of rows to copy - this must be even */
 void deblock_vert_copy_and_unpack(int stride, uint8_t* source, uint64_t* dest, int n)
 {
-  uint64_t* pmm1 = (uint64_t*)source;
-  uint64_t* pmm2 = (uint64_t*)dest;
   int i = -n / 2;
 
   for (; i < 0; ++i) {
@@ -1937,11 +1927,11 @@ void deblock_vert_default_filter_c(uint8_t* v, int stride, int QP)
   int l6 = 6 * stride;
   int l7 = 7 * stride;
   int l8 = 8 * stride;
-  int x, y, a3_0_SC, a3_1_SC, a3_2_SC, d_SC, q_SC;
+  int a3_0_SC, a3_1_SC, a3_2_SC, d_SC, q_SC;
   //uint8_t selfcheck[8][2];
 
     /* compute selfcheck matrix for later comparison */
-  for (x = 0; x < 8; x++)
+  for (int x = 0; x < 8; x++)
   {
     a3_0_SC = 2 * v[l3 + x] - 5 * v[l4 + x] + 5 * v[l5 + x] - 2 * v[l6 + x];
     a3_1_SC = 2 * v[l1 + x] - 5 * v[l2 + x] + 5 * v[l3 + x] - 2 * v[l4 + x];
@@ -2288,8 +2278,12 @@ void deblock_vert_default_filter_ORIGINAL(uint8_t* v, int stride, int QP)
 
 
 #ifndef ARCH_IS_X86_64
+const static uint64_t mm_fours = 0x0004000400040004;
+
 void deblock_vert_lpf9_mmx(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
 {
+
+
 #ifdef PP_SELF_CHECK
   int j, k;
   uint8_t selfcheck[64];
@@ -3882,7 +3876,7 @@ void dering_sse42(uint8_t* image, int height, int width, int quant) {
   int stride = width;
   uint8_t* b8x8, * b10x10;
   uint8_t b8x8filtered[64];
-  uint8_t min, max, thr;
+  int min, max, thr;
 
   int x, y;
 
@@ -4216,10 +4210,10 @@ int compare_lpf9_vert_all() {
 
   // Run each implementation
 #ifndef ARCH_IS_X86_64
-  deblock_vert_lpf9_mmx(&mmx_result_v_local[0], &mmx_result_p2[0], &mmx_result[8], WIDTH);      // Original MMX version
+  deblock_vert_lpf9_mmx((uint64_t*)&mmx_result_v_local[0], (uint64_t*)&mmx_result_p2[0], &mmx_result[8], WIDTH);      // Original MMX version
 #endif
-  deblock_vert_lpf9_ssse3(&sse_result_v_local[0], &sse_result_p2[0], &sse_result[8], WIDTH); // SSSE3 version
-  deblock_vert_lpf9_c(&c_result_v_local[0], &c_result_p2[0], &c_result[8], WIDTH);    // C version
+  deblock_vert_lpf9_ssse3((uint64_t *) & sse_result_v_local[0], (uint64_t*)&sse_result_p2[0], &sse_result[8], WIDTH); // SSSE3 version
+  deblock_vert_lpf9_c((uint64_t*)&c_result_v_local[0], (uint64_t*)&c_result_p2[0], &c_result[8], WIDTH);    // C version
 
   // Print results
   //print_array("MMX result", mmx_result, HEIGHT, WIDTH);

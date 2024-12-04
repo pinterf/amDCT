@@ -277,17 +277,20 @@ void boxBlurH(uint8_t* scl, uint8_t* tcl, uint16_t width, uint16_t height, uint8
 
     for (j = 0; j <= radiusY; j++) {                                     // 3 clocks
       val += scl[ri++] - fv;                               // 6 clocks
-      tcl[ti2++] -= (uint8_t)SrcSmoothDif[(tcl[ti2] - iarr[val]) + 255];   // 15 clocks
+      tcl[ti2] -= (uint8_t)SrcSmoothDif[(tcl[ti2] - iarr[val]) + 255];   // 15 clocks
+      ti2++;
     }
 
     for (j = radiusY + 1; j < width - radiusY; j++) {                        // 6 clocks
       val += scl[ri++] - scl[li++];            // 9 clocks
-      tcl[ti2++] -= (uint8_t)SrcSmoothDif[(tcl[ti2] - iarr[val]) + 255];   // 16 clocks
+      tcl[ti2] -= (uint8_t)SrcSmoothDif[(tcl[ti2] - iarr[val]) + 255];   // 16 clocks
+      ti2++;
     }
 
     for (j = width - radiusY; j < width; j++) {                            // 16 clocks
       val += lv - scl[li++];                               //  1 clock
-      tcl[ti2++] -= (uint8_t)SrcSmoothDif[(tcl[ti2] - iarr[val]) + 255];   // 19 clocks
+      tcl[ti2] -= (uint8_t)SrcSmoothDif[(tcl[ti2] - iarr[val]) + 255];   // 19 clocks
+      ti2++;
     }
   }
 

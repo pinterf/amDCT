@@ -11,4 +11,4 @@ void startDctLoop(FrameInfo_args* args);
 unsigned int __stdcall DctLoopThread(DctLoop_args* args);
 
 
-#endif _THREADING_H_
+#endif // _THREADING_H_

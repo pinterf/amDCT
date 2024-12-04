@@ -144,8 +144,8 @@ amDCT::amDCT(PClip _child, PClip _pf1, PClip _bf1, const int _quant, const int _
   if (sharpWAmt == 255 && sharpTAmt != 255) sharpWAmt = sharpTAmt;
   if (sharpTAmt == 255 && sharpWAmt != 255) sharpTAmt = sharpWAmt;
 
-  if (sharpWAmt == 255 && sharpTAmt == 255 ||
-    sharpWPos == 255 && sharpTPos == 255) {
+  if ((sharpWAmt == 255 && sharpTAmt == 255) ||
+    (sharpWPos == 255 && sharpTPos == 255)) {
 
     sharpWAmt = 0;
     sharpTAmt = 0;
@@ -338,7 +338,7 @@ PVideoFrame __stdcall amDCT::GetFrame(int n, IScriptEnvironment* env) {
 //  showMask    = 0   [0..70]    // This will return any of the following internally used masks. 0 returns processed frame.
 
 //  do              = 0             // 32 bit int used as a Bitmask. This allows the specifications of which specific internal filters to apply. 0 use automatic mode.
-AVSValue __cdecl Create_amDCT(AVSValue args, void* user_data, IScriptEnvironment* env) {
+AVSValue __cdecl Create_amDCT(AVSValue args, void* /*user_data*/, IScriptEnvironment* env) {
   return new amDCT(args[0].AsClip(),
     args[1].AsClip(),    // Our 20th parameter pf1          default NULL     NOT IMPLIMENTED YET
     args[2].AsClip(),    // Our 21th parameter bf1          default NULL     NOT IMPLIMENTED YET

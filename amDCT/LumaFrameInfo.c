@@ -3,7 +3,7 @@
 
 #include "LumaFrameInfo.h"
 #include "FrameInfo.h"
-#include "SmoothFilters.h"
+#include "smoothFilters.h"
 #include "MaxMinFilter.h"
 #include "Utilities.h"
 #include "BuildPreCompVals.h"
