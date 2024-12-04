@@ -36,7 +36,7 @@ int dct_loop_wrapper(void* arg) {
 }
 
 void startDctLoop(FrameInfo_args* args) {
-  _Alignas(16) DctLoop_args* DctLoopArgs = &args->MemoryArgs->DctLoopArgs[0];
+  DctLoop_args* DctLoopArgs = &args->MemoryArgs->DctLoopArgs[0];
   uint8_t ncpu = DctLoopArgs->ncpu;
   thrd_t threads[4];
   // This provides the first approximation of the number of shiftsPerThread
@@ -93,27 +93,27 @@ void startDctLoop(FrameInfo_args* args) {
   }
 
   const uint32_t len = args->sizeBlocksWork;
-  _Alignas(16) uint16_t* BF_accumP = args->MemoryArgs->DctLoopArgs[0].BF_accumP;
+  uint16_t* BF_accumP = args->MemoryArgs->DctLoopArgs[0].BF_accumP;
 
   // Combine the thread return info.  We just add together the BF_accum from each thread and return the result in BF_accum[0]
   switch (ncpu) {
   case 1:
     break;
   case 2: {
-    _Alignas(16) uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
+    uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
     copy_add_16to16_xmm(BF_accumP, BF_accumPk1, len);
     break;
   }
   case 3: {
-    _Alignas(16) uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
-    _Alignas(16) uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
+    uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
+    uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
     copy_add3_16to16_xmm(BF_accumP, BF_accumPk1, BF_accumPk2, len);
     break;
   }
   case 4: {
-    _Alignas(16) uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
-    _Alignas(16) uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
-    _Alignas(16) uint16_t* BF_accumPk3 = args->MemoryArgs->DctLoopArgs[3].BF_accumP;
+    uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
+    uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
+    uint16_t* BF_accumPk3 = args->MemoryArgs->DctLoopArgs[3].BF_accumP;
     copy_add4_16to16_c(BF_accumP, BF_accumPk1, BF_accumPk2, BF_accumPk3, len);
     break;
   }
