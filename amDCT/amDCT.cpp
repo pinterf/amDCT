@@ -6,6 +6,17 @@
 
 #define ALIGN 16
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+  int __cdecl compare_lpf9_all(void);
+  int __cdecl compare_dering_all(void);
+  int __cdecl compare_lpf9_vert_all(void);
+#ifdef __cplusplus
+}
+#endif
+
 /****************************
  * The following is the header definitions.
  * For larger projects, move this into a .h file
@@ -263,6 +274,12 @@ PVideoFrame __stdcall amDCT::GetFrame(int n, IScriptEnvironment* env) {
   unsigned char* psrc = (unsigned char*)srcp;
   height = src_height;
   width = src_width;
+
+  // call tests from getFrame
+  //compare_lpf9_all();
+  //compare_dering_all();
+  //compare_lpf9_vert_all();
+
 
   //    ppf1 = pf1Bufp;  // For testing the use of motion compensated frames.
   //    pbf1 = bf1Bufp;

@@ -4042,3 +4042,231 @@ void dering_c(uint8_t* image, int height, int width, int quant) {
   }
 }
 
+
+
+// tests, compare mmx, sse and c versions
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+// Helper function to print array contents
+void print_array(const char* label, uint8_t* arr, int height, int width) {
+  printf("%s:\n", label);
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      printf("%3d ", arr[y * width + x]);
+    }
+    printf("\n");
+  }
+  printf("\n");
+}
+
+// Helper function to compare arrays
+int compare_arrays(uint8_t* arr1, uint8_t* arr2, int height, int width) {
+  int diff_count = 0;
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x < width; x++) {
+      if (arr1[y * width + x] != arr2[y * width + x]) {
+        printf("Difference at [%d,%d]: %d vs %d\n",
+          x, y, arr1[y * width + x], arr2[y * width + x]);
+        diff_count++;
+      }
+    }
+  }
+  return diff_count;
+}
+
+int compare_lpf9_all() {
+  const int WIDTH = 28;
+  const int HEIGHT = 4;
+  const int QP = 16;  // Example QP value
+
+  // Allocate and initialize test arrays
+  uint8_t* original = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* mmx_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* ssse3_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* c_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+
+  // Fill with test pattern
+  for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    original[i] = (uint8_t)(((i+5)*4) % 256);  // Simple increasing pattern
+  }
+
+  // Create copies for each implementation
+  memcpy(mmx_result, original, WIDTH * HEIGHT);
+  memcpy(ssse3_result, original, WIDTH * HEIGHT);
+  memcpy(c_result, original, WIDTH * HEIGHT);
+
+  // Print initial state
+  print_array("Initial array", original, HEIGHT, WIDTH);
+
+  // Run each implementation
+#ifndef ARCH_IS_X86_64
+  deblock_horiz_lpf9_mmx(&mmx_result[8], WIDTH, QP);      // Original MMX version
+#endif
+  deblock_horiz_lpf9_ssse3(&ssse3_result[8], WIDTH, QP); // SSSE3 version
+  deblock_horiz_lpf9_c(&c_result[8], WIDTH, QP);    // C version
+
+  // Print results
+  print_array("MMX result", mmx_result, HEIGHT, WIDTH);
+  print_array("SSSE3 result", ssse3_result, HEIGHT, WIDTH);
+  print_array("C result", c_result, HEIGHT, WIDTH);
+
+  // Compare results
+  printf("Comparing results against MMX version:\n");
+  printf("SSSE3 differences: %d\n",
+    compare_arrays(mmx_result, ssse3_result, HEIGHT, WIDTH));
+  printf("C version differences: %d\n",
+    compare_arrays(mmx_result, c_result, HEIGHT, WIDTH));
+
+  // Cleanup
+  free(original);
+  free(mmx_result);
+  free(ssse3_result);
+  free(c_result);
+
+  return 0;
+}
+
+int compare_lpf9_vert_all() {
+  const int WIDTH = 128;
+  const int HEIGHT = 128;
+
+  // Allocate and initialize test arrays
+  uint8_t* original = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* mmx_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* sse_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* c_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+
+  uint16_t* original_p2 = (uint16_t*)malloc(2*8*sizeof(uint16_t));
+  uint16_t* mmx_result_p2 = (uint16_t*)malloc(2 * 8 * sizeof(uint16_t));
+  uint16_t* sse_result_p2 = (uint16_t*)malloc(2 * 8 * sizeof(uint16_t));
+  uint16_t* c_result_p2 = (uint16_t*)malloc(2 * 8 * sizeof(uint16_t));
+
+  uint16_t* original_v_local = (uint16_t*)malloc(9*8*sizeof(uint16_t));
+  uint16_t* mmx_result_v_local = (uint16_t*)malloc(9 * 8 * sizeof(uint16_t));
+  uint16_t* sse_result_v_local = (uint16_t*)malloc(9 * 8 * sizeof(uint16_t));
+  uint16_t* c_result_v_local = (uint16_t*)malloc(9 * 8 * sizeof(uint16_t));
+
+  // Fill with test pattern
+  for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    original[i] = (uint8_t)(((i + 5) * 4) % 256);  // Simple increasing pattern
+  }
+  for (int i = 0; i < 2*8; i++) {
+    original_p2[i] = (uint8_t)(((i + 5) * 4) % 256);  // Simple increasing pattern
+  }
+  for (int i = 0; i < 9*8; i++) {
+    original_v_local[i] = (uint8_t)(((i + 5) * 4) % 256);  // Simple increasing pattern
+  }
+
+  // Create copies for each implementation
+  memcpy(mmx_result, original, WIDTH * HEIGHT);
+  memcpy(sse_result, original, WIDTH * HEIGHT);
+  memcpy(c_result, original, WIDTH * HEIGHT);
+
+  memcpy(mmx_result_p2, original_p2, 2 * 8 * sizeof(uint16_t));
+  memcpy(sse_result_p2, original_p2, 2 * 8 * sizeof(uint16_t));
+  memcpy(c_result_p2, original_p2, 2 * 8 * sizeof(uint16_t));
+
+  memcpy(mmx_result_v_local, original_v_local, 9 * 8 * sizeof(uint16_t));
+  memcpy(sse_result_v_local, original_v_local, 9 * 8 * sizeof(uint16_t));
+  memcpy(c_result_v_local, original_v_local, 9 * 8 * sizeof(uint16_t));
+
+  // Print initial state
+  //print_array("Initial array", original, HEIGHT, WIDTH);
+
+  // Run each implementation
+#ifndef ARCH_IS_X86_64
+  deblock_vert_lpf9_mmx(&mmx_result_v_local[0], &mmx_result_p2[0], &mmx_result[8], WIDTH);      // Original MMX version
+#endif
+  deblock_vert_lpf9_ssse3(&sse_result_v_local[0], &sse_result_p2[0], &sse_result[8], WIDTH); // SSSE3 version
+  deblock_vert_lpf9_c(&c_result_v_local[0], &c_result_p2[0], &c_result[8], WIDTH);    // C version
+
+  // Print results
+  //print_array("MMX result", mmx_result, HEIGHT, WIDTH);
+  //print_array("SSE result", sse_result, HEIGHT, WIDTH);
+  //print_array("C result", c_result, HEIGHT, WIDTH);
+
+  // Compare results
+  printf("Comparing results against MMX version:\n");
+  printf("SSSE3 differences: %d\n",
+    compare_arrays(mmx_result, sse_result, HEIGHT, WIDTH));
+  printf("C version differences: %d\n",
+    compare_arrays(mmx_result, c_result, HEIGHT, WIDTH));
+
+  // Cleanup
+  free(original);
+  free(mmx_result);
+  free(sse_result);
+  free(c_result);
+
+  free(original_p2);
+  free(mmx_result_p2);
+  free(sse_result_p2);
+  free(c_result_p2);
+
+  free(original_v_local);
+  free(mmx_result_v_local);
+  free(sse_result_v_local);
+  free(c_result_v_local);
+
+  return 0;
+}
+
+
+
+int compare_dering_all() {
+  const int WIDTH = 128;
+  const int HEIGHT = 128;
+  const int QP = 2;  // Example quant value 3, 2, 1 is used
+
+  // Allocate and initialize test arrays
+  uint8_t* original = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* mmx_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* sse_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+  uint8_t* c_result = (uint8_t*)malloc(WIDTH * HEIGHT);
+
+  // Fill with test pattern
+  for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    original[i] = (uint8_t)(((i + 5) * 7) % 237);  // Simple increasing pattern
+  }
+
+  // Create copies for each implementation
+  memcpy(mmx_result, original, WIDTH * HEIGHT);
+  memcpy(sse_result, original, WIDTH * HEIGHT);
+  memcpy(c_result, original, WIDTH * HEIGHT);
+
+  // Print initial state
+  //print_array("Initial array", original, HEIGHT, WIDTH);
+
+  // Run each implementation
+  int safe_topleft_index = 0; // x=8, y=1
+#ifndef ARCH_IS_X86_64
+  dering_mmx(&mmx_result[safe_topleft_index], HEIGHT, WIDTH, QP);      // Original MMX version
+#endif
+  dering_sse42(&sse_result[safe_topleft_index], HEIGHT, WIDTH, QP);      // new SSE4.2
+  dering_c(&c_result[safe_topleft_index], HEIGHT, WIDTH, QP);      // new SSE4.2
+
+  // Print results
+  //print_array("MMX result", mmx_result, HEIGHT, WIDTH);
+  //print_array("C result", c_result, HEIGHT, WIDTH);
+
+  // Compare results
+  printf("Comparing results against MMX version:\n");
+  printf("SSE differences: %d\n",
+    compare_arrays(mmx_result, sse_result, HEIGHT, WIDTH));
+  printf("C vs SSE differences: %d\n",
+    compare_arrays(c_result, sse_result, HEIGHT, WIDTH));
+  /*printf("C vs MMX differences: %d\n",
+    compare_arrays(c_result, mmx_result, HEIGHT, WIDTH));*/
+
+  // Cleanup
+  free(original);
+  free(mmx_result);
+  free(sse_result);
+  free(c_result);
+
+  return 0;
+}
+
