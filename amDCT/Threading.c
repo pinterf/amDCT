@@ -1,22 +1,19 @@
-
-
-#include <windows.h>  // Required for threading.
 #include <process.h>
 
 #include "amDCT.h"
 #include "Threading.h"
 #include "DctLoop.h"
 #include "transfer_add.h"
+#include <threads.h>
+#include <stdint.h>
 
 
 
 
 // This collects all of the shift information.
-void
-setShift(uint8_t        starti,
+void setShift(uint8_t        starti,
   uint8_t        startj,
   FrameInfo_args* args) {
-
 
   int cntShift = args->MemoryArgs->DctLoopArgs[0].cntShift;
 
@@ -32,40 +29,18 @@ setShift(uint8_t        starti,
 
 // This distributes the shift information into ncpu groups which are assigned and dispatched to ncpu threads.
 // It then collects and combines the returned information from each thread.
-void
-startDctLoop(FrameInfo_args* args) {  //   DctLoop_arr    *DctLoopArr   =  (FrameInfoArgs->DctLoopArr[0]);
 
+int dct_loop_wrapper(void* arg) {
+  DctLoopThread(arg);
+  return 0;
+}
 
-  __declspec(align(16))  uint16_t* BF_accumP;
-  __declspec(align(16))  uint16_t* BF_accumPk1;
-  __declspec(align(16))  uint16_t* BF_accumPk2;
-  __declspec(align(16))  uint16_t* BF_accumPk3;
-
-  __declspec(align(16))  DctLoop_args* DctLoopArgs = &args->MemoryArgs->DctLoopArgs[0];
-  __declspec(align(16))   DctLoop_args* DctLoopArgs_ncpu = &args->MemoryArgs->DctLoopArgs[0];
-
-
-  HANDLE        hThread[MAX_CPU];
-  unsigned int  dwThreadId[MAX_CPU];
-
-  uint32_t i, len;
-  uint8_t  k;
-  uint8_t  shiftsPerThread;
-  uint8_t  endShift;
-  uint8_t  startShift = 0;
-  uint8_t  ncpu = DctLoopArgs->ncpu;
-  //  uint32_t sizeY          = args->sizeY;          //DctLoopArgs->src_height * DctLoopArgs->src_width;
-  //  uint32_t sizeBlocksWork = args->sizeBlocksWork;
-
-  for (k = 0; k < MAX_CPU; k++) {
-    hThread[k] = 0;
-    dwThreadId[k] = 0;
-  }
-
-
+void startDctLoop(FrameInfo_args* args) {
+  _Alignas(16) DctLoop_args* DctLoopArgs = &args->MemoryArgs->DctLoopArgs[0];
+  uint8_t ncpu = DctLoopArgs->ncpu;
+  thrd_t threads[4];
   // This provides the first approximation of the number of shiftsPerThread
-  shiftsPerThread = (uint8_t)(DctLoopArgs->cntShift / ncpu);
-
+  uint8_t shiftsPerThread = DctLoopArgs->cntShift / ncpu;
 
   // NOTE: This sets the shiftsPerThread so that the last thread
   // will be within + or - 1 of the total threads to do.
@@ -73,122 +48,77 @@ startDctLoop(FrameInfo_args* args) {  //   DctLoop_arr    *DctLoopArr   =  (Fram
   // will handle the + or - 1.
   if (ncpu == 3) {
     switch (DctLoopArgs->cntShift) {
-    case 4:   // 4 shifts
-      shiftsPerThread = 1;  // shifts 1, 1, 2
-      break;
-
-    case 8:   // 8 shifts
-      shiftsPerThread = 3;  // shifts 3, 3, 2
-      break;
-
-    case 16:   // 16 shifts
-      shiftsPerThread = 5;  // shifts 5, 5, 6
-      break;
-
-    case 32:   // 32 shifts
-      shiftsPerThread = 11;  // shifts 11, 11, 10
-      break;
-
-    case 64:   // 64 shifts
-      shiftsPerThread = 21;  // shifts 21, 21, 22
-      break;
+    case 4:  shiftsPerThread = 1; break; // shifts 1, 1, 2
+    case 8:  shiftsPerThread = 3; break; // shifts 3, 3, 2
+    case 16: shiftsPerThread = 5; break; // shifts 5, 5, 6
+    case 32: shiftsPerThread = 11; break; // shifts 11, 11, 10
+    case 64: shiftsPerThread = 21; break; // shifts 21, 21, 22
     }
   }
 
-
-
-  startShift = 0;
-  endShift = shiftsPerThread - 1;
+  uint8_t startShift = 0;
+  uint8_t endShift = shiftsPerThread - 1;
 
   // Store all of the thread specific information.
-  for (k = 0; k < ncpu; k++) {
-    DctLoopArgs_ncpu = &args->MemoryArgs->DctLoopArgs[k];
+  for (uint8_t k = 0; k < ncpu; k++) {
+    DctLoop_args* DctLoopArgs_ncpu = &args->MemoryArgs->DctLoopArgs[k];
     DctLoopArgs_ncpu->threadNum = k;
     DctLoopArgs_ncpu->startShift = startShift;
     DctLoopArgs_ncpu->endShift = endShift;
 
     // The 2 ifs handle the cases where the number of threads (ncpu) does not divide evenly into the number of shifts.
     // This only happens if ncpu == 3
-    if (k == ncpu - 1)                    DctLoopArgs_ncpu->endShift = DctLoopArgs->cntShift - 1;
-    if (startShift > (DctLoopArgs->cntShift - 1)) DctLoopArgs_ncpu->startShift = DctLoopArgs->cntShift - 1;
+    if (k == ncpu - 1) {
+      DctLoopArgs_ncpu->endShift = DctLoopArgs->cntShift - 1;
+    }
+    if (startShift > (DctLoopArgs->cntShift - 1)) {
+      DctLoopArgs_ncpu->startShift = DctLoopArgs->cntShift - 1;
+    }
 
     startShift += shiftsPerThread;
     endShift += shiftsPerThread;
 
-    for (i = 0; i < 64; i++) {
+    for (int i = 0; i < 64; i++) {
       DctLoopArgs_ncpu->starti[i] = DctLoopArgs->starti[i];
       DctLoopArgs_ncpu->startj[i] = DctLoopArgs->startj[i];
     }
   }
 
-  for (k = 0; k < ncpu; k++) {
-    hThread[k] = (HANDLE)_beginthreadex(NULL, 2000, DctLoopThread, (void*)&(args->MemoryArgs->DctLoopArgs[k]), 0, &dwThreadId[k]);
+  for (uint8_t k = 0; k < ncpu; k++) {
+    thrd_create(&threads[k], dct_loop_wrapper, &args->MemoryArgs->DctLoopArgs[k]);
   }
 
-
-  // And wait for them to finish
-  WaitForMultipleObjects(ncpu, hThread, TRUE, INFINITE);
-
-  // Close all thread handles upon completion.
-  for (k = 0; k < ncpu; k++) {
-    if (hThread[k] != 0) CloseHandle(hThread[k]);
+  for (uint8_t k = 0; k < ncpu; k++) {
+    thrd_join(threads[k], NULL);
   }
 
-  // see if this helps
-  for (k = 0; k < MAX_CPU; k++) {
-    hThread[k] = 0;
-    dwThreadId[k] = 0;
-  }
-
+  const uint32_t len = args->sizeBlocksWork;
+  _Alignas(16) uint16_t* BF_accumP = args->MemoryArgs->DctLoopArgs[0].BF_accumP;
 
   // Combine the thread return info.  We just add together the BF_accum from each thread and return the result in BF_accum[0]
   switch (ncpu) {
   case 1:
     break;
-
-  case 2:
-    len = args->sizeBlocksWork;
-
-    BF_accumP = args->MemoryArgs->DctLoopArgs[0].BF_accumP;
-    BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
-
-
+  case 2: {
+    _Alignas(16) uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
     copy_add_16to16_xmm(BF_accumP, BF_accumPk1, len);
-
-    //test_copy_add_16to16_c(BF_accumP, BF_accumPk1, len);
-//    test2_copy_add_16to16_c(BF_accumP, BF_accumPk1, len);
-
-//void  copy_16to16_clpsrc_c(uint16_t *dst, int16_t *src, uint32_t len) {
-
-//    copy_16to16_clpsrc_c(uint16_t *dst, int16_t *src, uint32_t len)
-
-    //copy_16to16_clpsrc_c(BF_accumP, BF_accumPk1, len);
     break;
-
-  case 3:
-    len = args->sizeBlocksWork;
-
-    BF_accumP = args->MemoryArgs->DctLoopArgs[0].BF_accumP;
-    BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
-    BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
+  }
+  case 3: {
+    _Alignas(16) uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
+    _Alignas(16) uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
     copy_add3_16to16_xmm(BF_accumP, BF_accumPk1, BF_accumPk2, len);
     break;
-
-  case 4:
-    len = args->sizeBlocksWork;
-
-    BF_accumP = args->MemoryArgs->DctLoopArgs[0].BF_accumP;
-    BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
-    BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
-    BF_accumPk3 = args->MemoryArgs->DctLoopArgs[3].BF_accumP;
-    //copy_add4_16to16_xmm(BF_accumP, BF_accumPk1, BF_accumPk2, BF_accumPk3, len);
+  }
+  case 4: {
+    _Alignas(16) uint16_t* BF_accumPk1 = args->MemoryArgs->DctLoopArgs[1].BF_accumP;
+    _Alignas(16) uint16_t* BF_accumPk2 = args->MemoryArgs->DctLoopArgs[2].BF_accumP;
+    _Alignas(16) uint16_t* BF_accumPk3 = args->MemoryArgs->DctLoopArgs[3].BF_accumP;
     copy_add4_16to16_c(BF_accumP, BF_accumPk1, BF_accumPk2, BF_accumPk3, len);
     break;
   }
-
-  return;
+  }
 }
-
 
 // This is called once per thread by _beginthreadex() above.
 // It unpacks the shift information the thread is supposed to process.
