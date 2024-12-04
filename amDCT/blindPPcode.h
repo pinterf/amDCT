@@ -25,6 +25,12 @@ void deblock_horiz_lpf9_ssse3(uint8_t* v, int stride, int QP);
 void deblock_horiz_lpf9_c(uint8_t* v, int stride, int QP);
 
 void doDering(FrameInfo_args* FrameInfoArgs);
+
 void dering(uint8_t* image, int height, int width, int quant);
+#ifndef ARCH_IS_X86_64
+void dering_mmx(uint8_t* image, int height, int width, int quant);
+#endif
+void dering_sse42(uint8_t* image, int height, int width, int quant);
+void dering_c(uint8_t* image, int height, int width, int quant);
 
 #endif // _BLINDPPCODE_H_
