@@ -538,7 +538,7 @@ int deblock_horiz_default_filter(uint8_t* v, int stride, int QP)
   return(1);
 }
 
-#ifndef USE_NEW_INTRINSICS
+#ifndef ARCH_IS_X86_64
 
 const static uint64_t mm64_0008 = 0x0008000800080008;
 const static uint64_t mm64_0101 = 0x0101010101010101;
@@ -555,116 +555,10 @@ const static uint64_t mm64_coefs[18] = {
   0x0001000000000000, /* v8 left */ 0x0006000400020001  /* p2 right */
 };
 static uint32_t mm32_p1p2;
-#endif
-//static uint8_t *pmm1;
 
 /* The 9-tap low pass filter used in "DC" regions */
 /* I'm not sure that I like this implementation any more...! */
-
-#ifdef USE_NEW_INTRINSICS
-void deblock_horiz_lpf9(uint8_t* v, int stride, int QP, const __m128i* mm64_coefs) {
-  int y, p1, p2;
-  __m128i mm32_p1p2, mm64_0008 = _mm_set1_epi16(8);
-  __m128i zero = _mm_setzero_si128();
-
-  for (y = 0; y < 4; y++) {
-    p1 = (abs(v[0 + y * stride] - v[1 + y * stride]) < QP) ? v[0 + y * stride] : v[1 + y * stride];
-    p2 = (abs(v[8 + y * stride] - v[9 + y * stride]) < QP) ? v[9 + y * stride] : v[8 + y * stride];
-    mm32_p1p2 = _mm_set1_epi16((p2 << 8) | p1);
-
-    __m128i* pmm1 = (__m128i*)(&(v[y * stride - 3])); /* this is 64-aligned */
-
-    __m128i mm0 = _mm_unpacklo_epi8(mm32_p1p2, mm32_p1p2); // mm0 = p2p2p2p2p1p1p1p1
-    __m128i mm2 = _mm_loadu_si128(pmm1); // mm2 = v4v3v2v1xxxxxxxx
-    __m128i mm6 = mm64_0008;
-    mm2 = _mm_unpackhi_epi8(mm2, mm2); // mm2 = v4__v3__v2__v1__
-
-    __m128i mm5 = mm6;
-    mm0 = _mm_unpacklo_epi8(mm0, zero); // mm0 = __p1__p1__p1__p1
-    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[0]); // mm0 *= mm64_coefs[0]
-
-    __m128i mm1 = _mm_unpacklo_epi8(mm2, mm2); // mm1 = v2v2v2v2v1v1v1v1
-    mm2 = _mm_unpackhi_epi8(mm2, mm2); // mm2 = v4v4v4v4v3v3v3v3
-
-    __m128i mm3 = _mm_unpacklo_epi8(mm1, zero); // mm3 = __v1__v1__v1__v1
-    mm1 = _mm_unpackhi_epi8(mm1, zero); // mm1 = __v2__v2__v2__v2
-    mm6 = _mm_add_epi16(mm6, mm0); // mm6 += mm0
-
-    mm0 = mm3;
-    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[1]); // mm0 *= mm64_coefs[1]
-    __m128i mm4 = mm1;
-    mm1 = _mm_mullo_epi16(mm1, mm64_coefs[2]); // mm1 *= mm64_coefs[2]
-
-    mm3 = _mm_mullo_epi16(mm3, mm64_coefs[4]); // mm3 *= mm64_coefs[4]
-    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[3]); // mm4 *= mm64_coefs[3]
-    mm5 = _mm_add_epi16(mm5, mm0); // mm5 += mm0
-
-    mm6 = _mm_add_epi16(mm6, mm1); // mm6 += mm1
-    mm2 = _mm_unpackhi_epi8(mm2, zero); // mm2 = __v4__v4__v4__v4
-    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
-
-    mm1 = _mm_unpacklo_epi8(mm2, zero); // mm1 = __v3__v3__v3__v3
-    mm6 = _mm_add_epi16(mm6, mm3); // mm6 += mm3
-
-    mm0 = mm1;
-    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[6]); // mm0 *= mm64_coefs[6]
-    mm4 = mm2;
-    mm2 = _mm_mullo_epi16(mm2, mm64_coefs[8]); // mm2 *= mm64_coefs[8]
-    mm6 = _mm_add_epi16(mm6, mm0); // mm6 += mm0
-
-    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[7]); // mm4 *= mm64_coefs[7]
-    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
-
-    mm1 = _mm_load_si128((__m128i*) & v[y * stride + 5]); // mm1 = xxxxxxxxv8v7v6v5
-    mm1 = _mm_unpacklo_epi8(mm1, mm1); // mm1 = v8v8v7v7v6v6v5v5
-    mm6 = _mm_add_epi16(mm6, mm2); // mm6 += mm2
-
-    mm2 = mm1;
-    mm2 = _mm_unpacklo_epi8(mm2, zero); // mm2 = __v5__v5__v5__v5
-    mm1 = _mm_unpackhi_epi8(mm1, zero); // mm1 = __v6__v6__v6__v6
-    mm5 = _mm_add_epi16(mm5, mm2); // mm5 += mm2
-
-    mm0 = mm1;
-    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[9]); // mm0 *= mm64_coefs[9]
-    mm4 = mm1;
-    mm1 = _mm_mullo_epi16(mm1, mm64_coefs[10]); // mm1 *= mm64_coefs[10]
-
-    mm2 = _mm_mullo_epi16(mm2, mm64_coefs[12]); // mm2 *= mm64_coefs[12]
-    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[11]); // mm4 *= mm64_coefs[11]
-    mm5 = _mm_add_epi16(mm5, mm0); // mm5 += mm0
-
-    mm6 = _mm_add_epi16(mm6, mm1); // mm6 += mm1
-    mm2 = _mm_unpackhi_epi8(mm2, zero); // mm2 = __v8__v8__v8__v8
-    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
-
-    mm1 = _mm_unpacklo_epi8(mm2, zero); // mm1 = __v7__v7__v7__v7
-    mm6 = _mm_add_epi16(mm6, mm2); // mm6 += mm2
-
-    mm0 = mm1;
-    mm0 = _mm_mullo_epi16(mm0, mm64_coefs[13]); // mm0 *= mm64_coefs[13]
-    mm4 = mm2;
-    mm1 = _mm_mullo_epi16(mm1, mm64_coefs[14]); // mm1 *= mm64_coefs[14]
-
-    mm2 = _mm_mullo_epi16(mm2, mm64_coefs[16]); // mm2 *= mm64_coefs[16]
-    mm4 = _mm_mullo_epi16(mm4, mm64_coefs[15]); // mm4 *= mm64_coefs[15]
-    mm5 = _mm_add_epi16(mm5, mm0); // mm5 += mm0
-
-    mm6 = _mm_add_epi16(mm6, mm1); // mm6 += mm1
-    mm5 = _mm_add_epi16(mm5, mm4); // mm5 += mm4
-
-    mm6 = _mm_srli_epi16(mm6, 4); // mm6 /= 16
-    mm5 = _mm_add_epi16(mm5, mm2); // mm5 += mm2
-
-    mm5 = _mm_srli_epi16(mm5, 4); // mm5 /= 16
-    mm6 = _mm_packus_epi16(mm6, mm5); // pack result into mm6
-
-    _mm_store_si128((__m128i*) & v[y * stride + 4], mm6); // v[] = mm6
-  }
-}
-#else
-/* The 9-tap low pass filter used in "DC" regions */
-/* I'm not sure that I like this implementation any more...! */
-void deblock_horiz_lpf9(uint8_t* v, int stride, int QP)
+void deblock_horiz_lpf9_mmx(uint8_t* v, int stride, int QP)
 {
   int y, p1, p2;
   uint64_t* pmm1;  // NOTE THIS HAD BEEN A GLOBAL !!!
@@ -871,6 +765,129 @@ void deblock_horiz_lpf9(uint8_t* v, int stride, int QP)
   __asm emms
 }
 #endif
+
+void deblock_horiz_lpf9(uint8_t* v, int stride, int QP) {
+#ifdef USE_NEW_INTRINSICS
+  deblock_horiz_lpf9_ssse3(v, stride, QP);
+#else
+  deblock_horiz_lpf9_mmx(v, stride, QP);
+#endif
+  // deblock_horiz_lpf9_c(v, stride, QP);
+}
+
+/* The 9-tap low pass filter used in "DC" regions */
+/* I'm not sure that I like this implementation any more...! */
+void deblock_horiz_lpf9_c(uint8_t* v, int stride, int QP) {
+  uint8_t temp[16];
+  for (int y = 0; y < 4; y++) {
+    // Calculate p1 and p2 based on QP threshold
+    int p1 = (abs(v[0 + y * stride] - v[1 + y * stride]) < QP) ?
+      v[0 + y * stride] : v[1 + y * stride];
+
+    int p2 = (abs(v[8 + y * stride] - v[9 + y * stride]) < QP) ?
+      v[9 + y * stride] : v[8 + y * stride];
+
+    uint8_t selfcheck[9];
+    int psum;
+    uint8_t* vv;
+    int i;
+    /* put the result into temp buffer in selfcheck[9], 1-8 indexes go back to v[1..8] */
+    /* low pass filtering (LPF9: 1 1 2 2 4 2 2 1 1) */
+    vv = &(v[y * stride]);
+
+    // used inputs: v[0] to v[9]
+    // p1 is decided by v[0] and v[1]
+    // p2 is decided by v[8] and v[9]
+    /*
+    Used from by weights above
+      v[1] calculated from:  p1, p1, p1, p1, v1, v2, v3, v4, v5
+      v[2] calculated from:  p1, p1, p1, v1, v2, v3, v4, v5, v6
+      v[3] calculated from:  p1, p1, v1, v2, v3, v4, v5, v6, v7
+      v[4] calculated from:  p1, v1, v2, v3, v4, v5, v6, v7, v8
+      v[5] calculated from:  v1, v2, v3, v4, v5, v6, v7, v8, p2
+      v[6] calculated from:  v2, v3, v4, v5, v6, v7, v8, p2, p2
+      v[7] calculated from:  v3, v4, v5, v6, v7, v8, p2, p2, p2
+      v[8] calculated from:  v4, v5, v6, v7, v8, p2, p2, p2, p2
+    */
+    // When index would go before v[1] then p1 is used there.
+    // When index would go after v[8] then p2 is used there.
+    // Weights for LowPassFilter9: 1 1 2 2 4 2 2 1 1
+
+    psum = p1 + p1 + p1 + vv[1] + vv[2] + vv[3] + vv[4] + 4;
+    selfcheck[1] = (((psum + vv[1]) << 1) - (vv[4] - vv[5])) >> 4; // 1*p1 + 1*p1 + 2*p1 + 2*p1 + 4*v[1] + 2*v[2] + 2*v[3] + 1*v[4] + 1*v[4]
+    // moving window. Add next on the right: vv[5], subtract one filler from the left: p1, modify the weights by adding or subtracting the appropriate v[] element
+    // and so on...
+    psum += vv[5] - p1;
+    selfcheck[2] = (((psum + vv[2]) << 1) - (vv[5] - vv[6])) >> 4;
+    psum += vv[6] - p1;
+    selfcheck[3] = (((psum + vv[3]) << 1) - (vv[6] - vv[7])) >> 4;
+    psum += vv[7] - p1;
+    selfcheck[4] = (((psum + vv[4]) << 1) + p1 - vv[1] - (vv[7] - vv[8])) >> 4;
+    psum += vv[8] - vv[1];
+    selfcheck[5] = (((psum + vv[5]) << 1) + (vv[1] - vv[2]) - vv[8] + p2) >> 4;
+    psum += p2 - vv[2];
+    selfcheck[6] = (((psum + vv[6]) << 1) + (vv[2] - vv[3])) >> 4;
+    psum += p2 - vv[3];
+    selfcheck[7] = (((psum + vv[7]) << 1) + (vv[3] - vv[4])) >> 4;
+    psum += p2 - vv[4];
+    selfcheck[8] = (((psum + vv[8]) << 1) + (vv[4] - vv[5])) >> 4;
+
+    for (int x = 1; x < 9; x++) {
+      v[x + y * stride] = selfcheck[x];
+    }
+  }
+}
+
+/* The 9-tap low pass filter used in "DC" regions */
+// intrinsic rewrite by pinterf
+// FIXME: not very optimal do it like in C and in deblock_vert_lpf9
+void deblock_horiz_lpf9_ssse3(uint8_t* v, int stride, int QP) {
+  for (int y = 0; y < 4; y++) {
+    // Calculate p1 and p2 based on QP threshold
+    int p1 = (abs(v[0 + y * stride] - v[1 + y * stride]) < QP) ? v[0 + y * stride] : v[1 + y * stride];
+    int p2 = (abs(v[8 + y * stride] - v[9 + y * stride]) < QP) ? v[9 + y * stride] : v[8 + y * stride];
+
+    uint8_t* vv = &(v[y * stride]);
+
+    // Create extended pixel vector: p1,p1,p1,p1, v1-v8, p2,p2,p2,p2
+    __m128i pixels = _mm_set_epi8(
+      p2, p2, p2, p2,                   // Last 4 bytes
+      vv[8], vv[7], vv[6], vv[5],       // Second half of input
+      vv[4], vv[3], vv[2], vv[1],       // First half of input
+      p1, p1, p1, p1                    // First 4 bytes
+    );
+
+    // Fixed weights vector: 1,1,2,2,4,2,2,1,1 (padded with zeros)
+    const __m128i weights = _mm_set_epi8(
+      0, 0, 0, 0, 0, 0, 0,
+      1,                    // Weight for last position
+      1, 2, 2, 4, 2, 2, 1, 1  // Weights for 9-point filter
+    );
+
+    // Results array for all 8 positions
+    uint8_t results[8];
+
+    // Process all 8 positions in a loop
+    for (int x = 0; x < 8; x++) {
+      // ssse3 unsigned * signed bytes to 16 bit signed, pre hadd-ed
+      __m128i mult = _mm_maddubs_epi16(pixels, weights); // SSSE3
+      // S7 S6 S5 S4 S3 S2 S1 S0
+      //  0  0  0 S4 S3 S2 S1 S0 
+      __m128i hadd = _mm_hadd_epi16(mult, mult); // SSSE3
+      hadd = _mm_hadd_epi16(hadd, hadd);
+      hadd = _mm_hadd_epi16(hadd, hadd);
+      results[x] = (uint8_t)((_mm_extract_epi16(hadd, 0) + 8) >> 4); // round and /= 16
+      pixels = _mm_srli_si128(pixels, 1);
+    }
+
+    // Store results back to memory
+    for (int x = 1; x < 9; x++) {
+      v[x + y * stride] = results[x - 1];
+    }
+  }
+}
+
+
 
 #define ABS_MACRO(X)  (((X)>0)?(X) : 0-(X))
 

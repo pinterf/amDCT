@@ -17,6 +17,13 @@ void deblock_vert_lpf9_c(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stri
 void deblock_horiz_DoDC(uint8_t* image, int height, int width, int stride, int quant);
 void deblock_vert_DoDC(uint8_t* image, int height, int width, int stride, int quant);
 
+void deblock_horiz_lpf9(uint8_t* v, int stride, int QP);
+#ifndef ARCH_IS_X86_64
+void deblock_horiz_lpf9_mmx(uint8_t* v, int stride, int QP);
+#endif
+void deblock_horiz_lpf9_ssse3(uint8_t* v, int stride, int QP);
+void deblock_horiz_lpf9_c(uint8_t* v, int stride, int QP);
+
 void doDering(FrameInfo_args* FrameInfoArgs);
 void dering(uint8_t* image, int height, int width, int quant);
 
