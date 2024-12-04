@@ -79,7 +79,6 @@ void doDering(FrameInfo_args* FrameInfoArgs) {
 
 int  deblock_horiz_DC_on(uint8_t* v, int stride, int QP);
 int  deblock_horiz_default_filter(uint8_t* v, int stride, int QP);
-void deblock_horiz_lpf9(uint8_t* v, int stride, int QP);
 int  deblock_horiz_useDC(uint8_t* v, int stride, int moderate_h);
 
 void deblock_vert_default_filter(uint8_t* v, int stride, int QP);
@@ -90,12 +89,10 @@ void deblock_vert_default_filter_ORIGINAL(uint8_t* v, int stride, int QP);
 
 const static uint64_t mm_fours = 0x0004000400040004;
 
-void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride);
 int deblock_vert_useDC(uint8_t* v, int stride, int moderate_v);
 
 void deblock_vert_choose_p1p2(uint8_t* v, int stride, uint64_t* p1p2, int QP);
 void deblock_vert_copy_and_unpack(int stride, uint8_t* source, uint64_t* dest, int n);
-void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride);
 
 #define ABS(X)        (((X)>0)?(X) : 0-(X))
 #define ABS_MACRO(X)  (((X)>0)?(X) : 0-(X))
@@ -2287,142 +2284,27 @@ void deblock_vert_default_filter_ORIGINAL(uint8_t* v, int stride, int QP)
 #endif
 }
 #endif
-// const static uint64_t mm_fours  = 0x0004000400040004;  ORIGINAL CODE
 
-/* Vertical 9-tap low-pass filter for use in "DC" regions of the picture */
-// from PP_SELF_CHECK case
-void deblock_vert_lpf9_c(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
-{
-  int l1 = 1 * stride;
-  int l2 = 2 * stride;
-  int l3 = 3 * stride;
-  int l4 = 4 * stride;
-  int l5 = 5 * stride;
-  int l6 = 6 * stride;
-  int l7 = 7 * stride;
-  int l8 = 8 * stride;
 
-  for (int j = 0; j < 8; j++) {
-    uint8_t* vv = &(v[j]);
-    int p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4];
-    int p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4];
-    int psum = p1 + p1 + p1 + vv[l1] + vv[l2] + vv[l3] + vv[l4] + 4;
-
-    v[l1 + j] = (((psum + vv[l1]) << 1) - (vv[l4] - vv[l5])) >> 4;
-    psum += vv[l5] - p1;
-    v[l2 + j] = (((psum + vv[l2]) << 1) - (vv[l5] - vv[l6])) >> 4;
-    psum += vv[l6] - p1;
-    v[l3 + j] = (((psum + vv[l3]) << 1) - (vv[l6] - vv[l7])) >> 4;
-    psum += vv[l7] - p1;
-    v[l4 + j] = (((psum + vv[l4]) << 1) + p1 - vv[l1] - (vv[l7] - vv[l8])) >> 4;
-    psum += vv[l8] - vv[l1];
-    v[l5 + j] = (((psum + vv[l5]) << 1) + (vv[l1] - vv[l2]) - vv[l8] + p2) >> 4;
-    psum += p2 - vv[l2];
-    v[l6 + j] = (((psum + vv[l6]) << 1) + (vv[l2] - vv[l3])) >> 4;
-    psum += p2 - vv[l3];
-    v[l7 + j] = (((psum + vv[l7]) << 1) + (vv[l3] - vv[l4])) >> 4;
-    psum += p2 - vv[l4];
-    v[l8 + j] = (((psum + vv[l8]) << 1) + (vv[l4] - vv[l5])) >> 4;
-  }
-}
-
-#ifdef USE_NEW_INTRINSICS
-// PF converted to intrinsics
-/* Vertical 9-tap low-pass filter for use in "DC" regions of the picture */
-// SSE2 regenerated from the simplified C version
-void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
-{
-  int l1 = 1 * stride;
-  int l2 = 2 * stride;
-  int l3 = 3 * stride;
-  int l4 = 4 * stride;
-  int l5 = 5 * stride;
-  int l6 = 6 * stride;
-  int l7 = 7 * stride;
-  int l8 = 8 * stride;
-
-  for (int j = 0; j < 8; j++) {
-    uint8_t* vv = &(v[j]);
-    int p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4];
-    int p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4];
-
-    __m128i p1_vec = _mm_set1_epi16(p1);
-    __m128i p2_vec = _mm_set1_epi16(p2);
-    __m128i four = _mm_set1_epi16(4);
-
-    __m128i vv_l1 = _mm_set1_epi16(vv[l1]);
-    __m128i vv_l2 = _mm_set1_epi16(vv[l2]);
-    __m128i vv_l3 = _mm_set1_epi16(vv[l3]);
-    __m128i vv_l4 = _mm_set1_epi16(vv[l4]);
-    __m128i vv_l5 = _mm_set1_epi16(vv[l5]);
-    __m128i vv_l6 = _mm_set1_epi16(vv[l6]);
-    __m128i vv_l7 = _mm_set1_epi16(vv[l7]);
-    __m128i vv_l8 = _mm_set1_epi16(vv[l8]);
-
-    __m128i psum = _mm_add_epi16(_mm_add_epi16(_mm_add_epi16(_mm_add_epi16(_mm_add_epi16(p1_vec, p1_vec), p1_vec), vv_l1), vv_l2), vv_l3);
-    psum = _mm_add_epi16(_mm_add_epi16(psum, vv_l4), four);
-
-    __m128i result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l1), 1);
-    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l4, vv_l5));
-    v[l1 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l5, p1_vec));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l2), 1);
-    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l5, vv_l6));
-    v[l2 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l6, p1_vec));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l3), 1);
-    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l6, vv_l7));
-    v[l3 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l7, p1_vec));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l4), 1);
-    result = _mm_add_epi16(result, p1_vec);
-    result = _mm_sub_epi16(result, vv_l1);
-    result = _mm_sub_epi16(result, _mm_sub_epi16(vv_l7, vv_l8));
-    v[l4 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(vv_l8, vv_l1));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l5), 1);
-    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l1, vv_l2));
-    result = _mm_sub_epi16(result, vv_l8);
-    result = _mm_add_epi16(result, p2_vec);
-    v[l5 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(p2_vec, vv_l2));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l6), 1);
-    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l2, vv_l3));
-    v[l6 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(p2_vec, vv_l3));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l7), 1);
-    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l3, vv_l4));
-    v[l7 + j] = _mm_extract_epi16(result, 0) >> 4;
-
-    psum = _mm_add_epi16(psum, _mm_sub_epi16(p2_vec, vv_l4));
-    result = _mm_slli_epi16(_mm_add_epi16(psum, vv_l8), 1);
-    result = _mm_add_epi16(result, _mm_sub_epi16(vv_l4, vv_l5));
-    v[l8 + j] = _mm_extract_epi16(result, 0) >> 4;
-  }
-}
-#else
-/* Vertical 9-tap low-pass filter for use in "DC" regions of the picture */
-void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
+#ifndef ARCH_IS_X86_64
+void deblock_vert_lpf9_mmx(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
 {
 #ifdef PP_SELF_CHECK
   int j, k;
-  uint8_t selfcheck[64], * vv;
+  uint8_t selfcheck[64];
+  uint16_t* vv;
   int p1, p2, psum;
   /* define semi-constants to enable us to move up and down the picture easily... */
-  int l1 = 1 * stride;
-  int l2 = 2 * stride;
-  int l3 = 3 * stride;
-  int l4 = 4 * stride;
-  int l5 = 5 * stride;
-  int l6 = 6 * stride;
-  int l7 = 7 * stride;
-  int l8 = 8 * stride;
+  int local_stride = 8; // for v_local
+  int l1 = 1 * local_stride;
+  int l2 = 2 * local_stride;
+  int l3 = 3 * local_stride;
+  int l4 = 4 * local_stride;
+  int l5 = 5 * local_stride;
+  int l6 = 6 * local_stride;
+  int l7 = 7 * local_stride;
+  int l8 = 8 * local_stride;
+
 #endif
 
 
@@ -2431,12 +2313,15 @@ void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride
   /* loop left->right */
   for (j = 0; j < 8; j++)
   {
-    vv = &(v[j]);
+    vv = &((uint16_t*)(v_local))[j]; // 2*8 uint16_t
     p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4]; /* yuck! */
     p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4]; /* yuck! */
     /* the above may well be endian-fussy */
     psum = p1 + p1 + p1 + vv[l1] + vv[l2] + vv[l3] + vv[l4] + 4;
+    // 1*p1 + 1*p1 + 2*p1 + 2*p1 + 4*vv[l1] + 2*vv[l2] + 2*vv[l3] + 1*vv[l4] + 1*vv[l4]
     selfcheck[j + 8 * 0] = (((psum + vv[l1]) << 1) - (vv[l4] - vv[l5])) >> 4;
+    // moving window. Add next on the right: vv[l5], subtract one filler from the left: p1, modify the weights by adding or subtracting the appropriate vv[] element
+    // and so on...
     psum += vv[l5] - p1;
     selfcheck[j + 8 * 1] = (((psum + vv[l2]) << 1) - (vv[l5] - vv[l6])) >> 4;
     psum += vv[l6] - p1;
@@ -2804,8 +2689,8 @@ void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride
   {   /* loop left->right */
     for (j = 0; j < 8; j++)
     {
-      vv = &(v[(k + 1) * stride + j]);
-      if (*vv != selfcheck[j + 8 * k])
+      uint8_t* target_check = &(v[(k + 1) * stride + j]);
+      if (*target_check != selfcheck[j + k * 8])
       {
         dprintf("ERROR: problem with vertical LPF9 filter in row %d\n", k + 1);
       }
@@ -2818,7 +2703,289 @@ void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride
 }
 #endif
 
+void deblock_vert_lpf9(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride) {
+#ifdef USE_NEW_INTRINSICS
+  deblock_vert_lpf9_ssse3(v_local, p1p2, v, stride);
+#else
+  deblock_vert_lpf9_mmx(v_local, p1p2, v, stride);
+#endif
+  // deblock_vert_lpf9_c(v_local, p1p2, v, stride);
+}
 
+/* Vertical 9-tap low-pass filter, weights 1-1-2-2-4-2-2-1-1 */
+// v_local is a 9x8 uint_16 array (9*16 bytes), serves as input. Value 0-255 byte pixel values are already.
+// extended to uint16_t size. The 0th eight uint16_t elements are not used, v_local contains valid data (8 * 8 uint16_t) from there.
+// p1p2: an uint64_t pointer, but it really stores a 2*8 element uint16_t array: 8 different p1 values, then 8 p2 values; actual p1 and p2 are different for each j
+// "uint8_t *v" this pointer goes into ecx in the mmx version. Results are stored as 8 bytes to pointers v + 1*stride to v + 8*stride
+// For storing the vertical step between loops is "int stride"
+// v[1] calculated from : p1, p1, p1, p1, v1, v2, v3, v4, v5
+// v[2] calculated from : p1, p1, p1, v1, v2, v3, v4, v5, v6
+// v[3] calculated from : p1, p1, v1, v2, v3, v4, v5, v6, v7
+// v[4] calculated from : p1, v1, v2, v3, v4, v5, v6, v7, v8
+// v[5] calculated from : v1, v2, v3, v4, v5, v6, v7, v8, p2
+// v[6] calculated from : v2, v3, v4, v5, v6, v7, v8, p2, p2
+// v[7] calculated from : v3, v4, v5, v6, v7, v8, p2, p2, p2
+// v[8] calculated from : v4, v5, v6, v7, v8, p2, p2, p2, p2
+// When index would go before v[1] then p1 is used there.
+// When index would go after v[8] then p2 is used there.
+// Weights for LowPassFilter9: 1 1 2 2 4 2 2 1 1
+
+void deblock_vert_lpf9_c(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride)
+{
+  int j, k;
+  uint8_t selfcheck[64];
+  uint16_t* vv;
+  int p1, p2, psum;
+  /* define semi-constants to enable us to move up and down the picture easily... */
+  int local_stride = 8; // for v_local
+  int l1 = 1 * local_stride;
+  int l2 = 2 * local_stride;
+  int l3 = 3 * local_stride;
+  int l4 = 4 * local_stride;
+  int l5 = 5 * local_stride;
+  int l6 = 6 * local_stride;
+  int l7 = 7 * local_stride;
+  int l8 = 8 * local_stride;
+
+  /* generate a self-check version of the filter result in selfcheck[64] */
+  /* loop left->right */
+  for (j = 0; j < 8; j++)
+  {
+    vv = &((uint16_t*)(v_local))[j]; // 2*8 uint16_t
+    p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4]; /* yuck! */
+    p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4]; /* yuck! */
+    /* the above may well be endian-fussy */
+    psum = p1 + p1 + p1 + vv[l1] + vv[l2] + vv[l3] + vv[l4] + 4;
+    // 1*p1 + 1*p1 + 2*p1 + 2*p1 + 4*vv[l1] + 2*vv[l2] + 2*vv[l3] + 1*vv[l4] + 1*vv[l4]
+    selfcheck[j + 8 * 0] = (((psum + vv[l1]) << 1) - (vv[l4] - vv[l5])) >> 4;
+    // moving window. Add next on the right: vv[l5], subtract one filler from the left: p1, modify the weights by adding or subtracting the appropriate vv[] element
+    // and so on...
+    psum += vv[l5] - p1;
+    selfcheck[j + 8 * 1] = (((psum + vv[l2]) << 1) - (vv[l5] - vv[l6])) >> 4;
+    psum += vv[l6] - p1;
+    selfcheck[j + 8 * 2] = (((psum + vv[l3]) << 1) - (vv[l6] - vv[l7])) >> 4;
+    psum += vv[l7] - p1;
+    selfcheck[j + 8 * 3] = (((psum + vv[l4]) << 1) + p1 - vv[l1] - (vv[l7] - vv[l8])) >> 4;
+    psum += vv[l8] - vv[l1];
+    selfcheck[j + 8 * 4] = (((psum + vv[l5]) << 1) + (vv[l1] - vv[l2]) - vv[l8] + p2) >> 4;
+    psum += p2 - vv[l2];
+    selfcheck[j + 8 * 5] = (((psum + vv[l6]) << 1) + (vv[l2] - vv[l3])) >> 4;
+    psum += p2 - vv[l3];
+    selfcheck[j + 8 * 6] = (((psum + vv[l7]) << 1) + (vv[l3] - vv[l4])) >> 4;
+    psum += p2 - vv[l4];
+    selfcheck[j + 8 * 7] = (((psum + vv[l8]) << 1) + (vv[l4] - vv[l5])) >> 4;
+  }
+  /* use the self-check version of the filter result in selfcheck[64] to verify the filter output */
+  /* loop top->bottom */
+  for (k = 0; k < 8; k++)
+  {   /* loop left->right */
+    for (j = 0; j < 8; j++) {
+      v[(k + 1) * stride + j] = selfcheck[j + k * 8];
+    }
+  }
+}
+
+#if 0
+// similar to the horizontal version, but input structure is a bit different
+// rather like following the brute logic of summing data*weights
+// we have better version
+void deblock_vert_lpf9_ssse3_b(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride) {
+  int p1, p2;
+  int local_stride = 8;
+  /* define semi-constants to enable us to move up and down the picture easily... */
+  int l1 = 1 * local_stride;
+  int l2 = 2 * local_stride;
+  int l3 = 3 * local_stride;
+  int l4 = 4 * local_stride;
+  int l5 = 5 * local_stride;
+  int l6 = 6 * local_stride;
+  int l7 = 7 * local_stride;
+  int l8 = 8 * local_stride;
+
+  /* The 9-tap low pass filter used in "DC" regions */
+  /* loop left->right */
+  for (int j = 0; j < 8; j++) {
+    p1 = ((uint16_t*)(&(p1p2[0 + j / 4])))[j % 4]; /* yuck! */
+    p2 = ((uint16_t*)(&(p1p2[2 + j / 4])))[j % 4]; /* yuck! */
+
+    uint16_t* vv = &((uint16_t*)(v_local))[j]; // 2*8 uint16_t with only 8 bit valid data inside
+
+    // Create extended pixel vector: p1,p1,p1,p1, v1-v8, p2,p2,p2,p2
+    __m128i pixels = _mm_set_epi8(
+      p2, p2, p2, p2,                   // Last 4 bytes
+      vv[l8], vv[l7], vv[l6], vv[l5],       // Second half of input
+      vv[l4], vv[l3], vv[l2], vv[l1],       // First half of input
+      p1, p1, p1, p1                    // First 4 bytes
+    );
+
+    // Fixed weights vector: 1,1,2,2,4,2,2,1,1 (padded with zeros)
+    const __m128i weights = _mm_set_epi8(
+      0, 0, 0, 0, 0, 0, 0,
+      1,                    // Weight for last position
+      1, 2, 2, 4, 2, 2, 1, 1  // Weights for 9-point filter
+    );
+
+    // Results array for all 8 positions
+    uint8_t results[8];
+
+    // Process all 8 positions in a loop
+    for (int x = 0; x < 8; x++) {
+      // ssse3 unsigned * signed bytes to 16 bit signed, pre hadd-ed
+      __m128i mult = _mm_maddubs_epi16(pixels, weights); // SSSE3
+      // S7 S6 S5 S4 S3 S2 S1 S0
+      //  0  0  0 S4 S3 S2 S1 S0 
+      __m128i hadd = _mm_hadd_epi16(mult, mult); // SSSE3
+      hadd = _mm_hadd_epi16(hadd, hadd);
+      hadd = _mm_hadd_epi16(hadd, hadd);
+      results[x] = (uint8_t)((_mm_extract_epi16(hadd, 0) + 8) >> 4); // round and /= 16
+      pixels = _mm_srli_si128(pixels, 1);
+    }
+
+    // Store results back to memory
+    for (int x = 0; x < 8; x++) {
+      //v[x + (j+1) * stride] = results[x];
+      v[(x + 1) * stride + j] = results[x];
+    }
+  }
+}
+#endif
+
+// based on deblock_horiz_lpf9_c
+// doing only smart add and subtracts from a previous temporary result
+void deblock_vert_lpf9_ssse3(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride) {
+  __m128i* vv_ptr = (__m128i*)v_local;
+  __m128i* p1p2_ptr = (__m128i*)p1p2;
+
+  // Load p1 and p2 values (each contains 8 uint16_t values)
+  __m128i p1_vec = _mm_load_si128(p1p2_ptr);     // First 8 values (p1)
+  __m128i p2_vec = _mm_load_si128(p1p2_ptr + 1); // Next 8 values (p2)
+
+  // Load input rows (v1 through v8)
+  __m128i v1 = _mm_load_si128(vv_ptr + 1);
+  __m128i v2 = _mm_load_si128(vv_ptr + 2);
+  __m128i v3 = _mm_load_si128(vv_ptr + 3);
+  __m128i v4 = _mm_load_si128(vv_ptr + 4);
+  __m128i v5 = _mm_load_si128(vv_ptr + 5);
+  __m128i v6 = _mm_load_si128(vv_ptr + 6);
+  __m128i v7 = _mm_load_si128(vv_ptr + 7);
+  __m128i v8 = _mm_load_si128(vv_ptr + 8);
+
+  // Constants
+  __m128i four = _mm_set1_epi16(4);
+
+  // Pre-calculate common terms for the sliding window
+  __m128i p1_x3 = _mm_add_epi16(p1_vec, _mm_add_epi16(p1_vec, p1_vec)); // p1 * 3
+
+  // Initial sum for sliding window
+  __m128i base_sum = _mm_add_epi16(p1_x3, v1);
+  base_sum = _mm_add_epi16(base_sum, v2);
+  base_sum = _mm_add_epi16(base_sum, v3);
+  base_sum = _mm_add_epi16(base_sum, v4);
+  base_sum = _mm_add_epi16(base_sum, four); // Add rounding factor, factor is 8 but will get multiplied by 2 soon
+
+  // Process each output row using sliding window approach
+  __m128i result;
+  __m128i window_sum;
+
+  // selfcheck[1]
+  // v[1] = (p1 + p1 + 2*p1 + 2*p1 + 4*v1 + v2*2 + v3*2 + v4 + v5) >> 4
+  window_sum = _mm_add_epi16(base_sum, v1);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v5);
+  window_sum = _mm_sub_epi16(window_sum, v4);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 1 * stride), result);
+
+  // selfcheck[2]
+  // Slide window: subtract one p1, add v6 and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, p1_vec);
+  base_sum = _mm_add_epi16(base_sum, v5);
+  window_sum = _mm_add_epi16(base_sum, v2);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v6);
+  window_sum = _mm_sub_epi16(window_sum, v5);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 2 * stride), result);
+
+  // selfcheck[3]
+  // Slide window: subtract one p1, add v7 and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, p1_vec);
+  base_sum = _mm_add_epi16(base_sum, v6);
+  window_sum = _mm_add_epi16(base_sum, v3);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v7);
+  window_sum = _mm_sub_epi16(window_sum, v6);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 3 * stride), result);
+
+  // selfcheck[4]
+  // Slide window: subtract p1, add v8, adjust weights and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, p1_vec);
+  base_sum = _mm_add_epi16(base_sum, v7);
+  window_sum = _mm_add_epi16(base_sum, v4);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, p1_vec);
+  window_sum = _mm_sub_epi16(window_sum, v1);
+  window_sum = _mm_add_epi16(window_sum, v8);
+  window_sum = _mm_sub_epi16(window_sum, v7);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 4 * stride), result);
+
+  // selfcheck[5]
+  // Middle point: transition from p1 to p2 and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, v1);
+  base_sum = _mm_add_epi16(base_sum, v8);
+  window_sum = _mm_add_epi16(base_sum, v5);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v1);
+  window_sum = _mm_sub_epi16(window_sum, v2);
+  window_sum = _mm_add_epi16(window_sum, p2_vec);
+  window_sum = _mm_sub_epi16(window_sum, v8);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 5 * stride), result);
+
+  // selfcheck[6]
+  // Slide window: replace v2 with p2 and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, v2);
+  base_sum = _mm_add_epi16(base_sum, p2_vec);
+  window_sum = _mm_add_epi16(base_sum, v6);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v2);
+  window_sum = _mm_sub_epi16(window_sum, v3);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 6 * stride), result);
+
+  // selfcheck[7]
+  // Slide window: replace v3 with p2 and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, v3);
+  base_sum = _mm_add_epi16(base_sum, p2_vec);
+  window_sum = _mm_add_epi16(base_sum, v7);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v3);
+  window_sum = _mm_sub_epi16(window_sum, v4);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 7 * stride), result);
+
+  // selfcheck[8]
+  // Final row: replace v4 with p2 and others, see C implementation
+  base_sum = _mm_sub_epi16(base_sum, v4);
+  base_sum = _mm_add_epi16(base_sum, p2_vec);
+  window_sum = _mm_add_epi16(base_sum, v8);
+  window_sum = _mm_add_epi16(window_sum, window_sum);
+  window_sum = _mm_add_epi16(window_sum, v4);
+  window_sum = _mm_sub_epi16(window_sum, v5);
+  result = _mm_srli_epi16(window_sum, 4);
+  result = _mm_packus_epi16(result, result);
+  _mm_storel_epi64((__m128i*)(v + 8 * stride), result);
+
+}
 
 /* decide DC mode or default mode in assembler */
 // C conversion by PF
