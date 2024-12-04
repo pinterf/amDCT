@@ -145,6 +145,7 @@ void deblock_horiz(uint8_t* image, int height, int width, int stride, int quant)
       useDC = deblock_horiz_useDC(v, stride, moderate_h);   // OLD WORKING
       useDC = 0; //deblock_horiz_useDC(v, stride, moderate_h);
 
+      // FIXME note: intentionally dead code?? test? copy-paste?
       if (useDC) /* use DC offset mode */
       {
         //continue;
@@ -171,7 +172,8 @@ void deblock_horiz(uint8_t* image, int height, int width, int stride, int quant)
 }
 
 
-
+#if 0
+// not used
 /*
  * This code is a horizontal deblocking filter - i.e. it will smooth _vertical_ block edges
  * which means that if you do a diff before and after running the filter you will see
@@ -236,6 +238,7 @@ void deblock_horiz_DoDC(uint8_t* image, int height, int width, int stride, int q
 
   return;
 }
+#endif
 
 
 
@@ -931,7 +934,7 @@ int deblock_horiz_useDC(uint8_t* v, int stride, int moderate_h) {
       __m128i abs_diff = _mm_max_epu8(diff, _mm_subs_epu8(zero, diff));
 
       __m128i cmp = _mm_cmpeq_epi8(_mm_min_epu8(abs_diff, one), abs_diff);
-      eq_cnt2 += _mm_popcnt_u32(_mm_movemask_epi8(cmp));
+      eq_cnt2 += _mm_popcnt_u32(_mm_movemask_epi8(cmp)); // SSE4.2
     }
   }
 
@@ -1728,7 +1731,7 @@ void deblock_vert_copy_and_unpack_c(int stride, uint8_t* source, uint64_t* dest,
 }
 
 #ifdef USE_NEW_INTRINSICS
-/* function using MMX to copy an 8-pixel wide column and unpack to 16-bit values */
+/* copy an 8-pixel wide column and unpack to 16-bit values */
 /* n is the number of rows to copy - this must be even */
 void deblock_vert_copy_and_unpack(int stride, uint8_t* source, uint64_t* dest, int n)
 {
@@ -1751,25 +1754,6 @@ void deblock_vert_copy_and_unpack(int stride, uint8_t* source, uint64_t* dest, i
     _mm_store_si128((__m128i*)dest, xmm1); // Store the result in dest
     dest += 2; // Move to the next 16 bytes in dest
   }
-#ifdef PP_SELF_CHECK
-  int j, k;
-#endif
-
-#ifdef PP_SELF_CHECK
-  /* check that MMX copy has worked correctly */
-  for (k = 0; k < n; k++)
-  {
-    for (j = 0; j < 8; j++)
-    {
-      if (((uint16_t*)dest)[k * 8 + j] != source[k * stride + j])
-      {
-        dprintf("ERROR: MMX copy block is flawed at (%d, %d)\n", j, k);
-      }
-    }
-  }
-#endif
-
-
 }
 #else
 /* function using MMX to copy an 8-pixel wide column and unpack to 16-bit values */
@@ -3009,7 +2993,7 @@ void deblock_vert_lpf9_ssse3(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int 
 int deblock_vert_useDC_c(uint8_t* v, int stride, int moderate_v)
 {
   int eq_cnt, useDC;
-  int useDC2, i, j;
+  int i, j;
 
   /* C-code version for testing */
   eq_cnt = 0;
@@ -3020,11 +3004,12 @@ int deblock_vert_useDC_c(uint8_t* v, int stride, int moderate_v)
       if (ABS(v[j * stride + i] - v[(j + 1) * stride + i]) <= 1) eq_cnt++;
     }
   }
-  useDC2 = (eq_cnt > moderate_v);
+  useDC = (eq_cnt > moderate_v);
 
-  return useDC2;
+  return useDC;
 }
 
+#ifdef USE_NEW_INTRINSICS
 // new helper function SSE2 compat
 int my_mm_popcnt_epi8(__m128i x) {
   // Count the number of set bits in each byte
