@@ -151,15 +151,15 @@ int   amDCTmain(
   if (frameSize < 256) frameSize = 256;    // This is only to keep Microsoft lint happy.
 
   // Check for errors that should never occur.
-  if (src_height < 16 || src_width < 16) return(1);
+  if (src_height < 16 || src_width < 16) return(2);
 
   // Check that  width and height are evenly divisible by 8 since the DCT routines operate on 8x8 blocks of pixels.
-  if (src_height_a % 8) return(1);
-  if (src_width_a % 8) return(1);
-  if (src_pitch_a % 8) return(1);
-  if (dst_height_a % 8) return(1);
-  if (dst_width_a % 8) return(1);
-  if (dst_pitch_a % 8) return(1);
+  if (src_height_a % 8) return(3);
+  if (src_width_a % 8) return(3);
+  if (src_pitch_a % 8) return(3);
+  if (dst_height_a % 8) return(3);
+  if (dst_width_a % 8) return(3);
+  if (dst_pitch_a % 8) return(3);
 
 
   // Bring out of spec arguments into normal range.  The calling program should have done this.

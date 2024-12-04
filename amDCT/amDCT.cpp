@@ -284,8 +284,18 @@ PVideoFrame __stdcall amDCT::GetFrame(int n, IScriptEnvironment* env) {
   //    ppf1 = pf1Bufp;  // For testing the use of motion compensated frames.
   //    pbf1 = bf1Bufp;
       //if (aaDCT(psrc, ppf1, pbf1, dstp, height, width, dst_height, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, showMask, T2, ncpu) > 0) {
-  if (amDCTmain(psrc, dstp, height, width, src_pitch, dst_height, dst_width, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, darkStart, darkAmt, showMask, T2, ncpu) == 1) {
-    env->ThrowError("amDCT: out of memory");
+  int retval = amDCTmain(psrc, dstp, height, width, src_pitch, dst_height, dst_width, dst_pitch, quant, adapt, shift, matrix, qtype, expand, sharpWPos, sharpWAmt, sharpTPos, sharpTAmt, quality, brightStart, brightAmt, darkStart, darkAmt, showMask, T2, ncpu);
+  if (retval != 0) {
+    switch (retval) {
+    case 1:
+      env->ThrowError("amDCT: could not allocate memory");
+    case 2:
+      env->ThrowError("amDCT: source width and hight must be at least 16");
+    case 3:
+      env->ThrowError("amDCT: width (%d) and height (%d) error: both must be multiple of 8", width, height);
+    default:
+      env->ThrowError("amDCT: internal error %d", retval);
+    }
   }
 
   // end of Y plane Code
