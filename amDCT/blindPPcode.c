@@ -3279,552 +3279,590 @@ void dering_mmx(uint8_t* image, int height, int width, int quant) {
       b10x10 = &(image[stride * (y - 1) + (x - 1)]);
 
       // Threshold determination - find min and max grey levels in the block 
-      __m128i min_val = _mm_loadl_epi64((__m128i*)b8x8);
-      __m128i max_val = min_val;
+      // but remove loop through 64 bytes.  trbarry 03/13/2002
 
-      for (int i = 1; i < 8; ++i) {
-        __m128i row = _mm_loadl_epi64((__m128i*)(b8x8 + i * stride));
-        min_val = _mm_min_epu8(min_val, row);
-        max_val = _mm_max_epu8(max_val, row);
+      __asm
+      {
+        mov    esi, b8x8    // the block addr
+        mov    eax, stride    // offset to next qword in block
+
+        movq  mm0, qword ptr[esi] // row 0, 1st qword is our min
+        movq    mm1, mm0      // .. and our max
+
+        pminub  mm0, qword ptr[esi + eax]    // row 1
+        pmaxub  mm1, qword ptr[esi + eax]
+
+        lea    esi, [esi + 2 * eax]      // bump for next 2
+        pminub  mm0, qword ptr[esi]      // row 2
+        pmaxub  mm1, qword ptr[esi]
+
+        pminub  mm0, qword ptr[esi + eax]    // row 3
+        pmaxub  mm1, qword ptr[esi + eax]
+
+        lea    esi, [esi + 2 * eax]      // bump for next 2
+        pminub  mm0, qword ptr[esi]      // row 4
+        pmaxub  mm1, qword ptr[esi]
+
+        pminub  mm0, qword ptr[esi + eax]    // row 5
+        pmaxub  mm1, qword ptr[esi + eax]
+
+        lea    esi, [esi + 2 * eax]      // bump for next 2
+        pminub  mm0, qword ptr[esi]      // row 6
+        pmaxub  mm1, qword ptr[esi]
+
+        pminub  mm0, qword ptr[esi + eax]    // row 7
+        pmaxub  mm1, qword ptr[esi + eax]
+
+        // get min of 8 bytes in mm0
+        pshufw  mm2, mm0, (3 << 2) + 2      // words 3,2 into low words of mm2
+        pminub  mm0, mm2            // now 4 min bytes in low half of mm0
+        pshufw  mm2, mm0, 1               // get word 1 of mm0 in low word of mm2
+        pminub  mm0, mm2            // got it down to 2 bytes
+        movq  mm2, mm0
+        psrlq  mm2, 8              // byte 1 to low byte
+        pminub  mm0, mm2            // our answer in low order byte
+        movd  eax, mm0
+        mov    min, al              // save answer
+
+        // get max of 8 bytes in mm1
+        pshufw  mm2, mm1, (3 << 2) + 2      // words 3,2 into low words of mm2
+        pmaxub  mm1, mm2            // now 4 max bytes in low half of mm1
+        pshufw  mm2, mm1, 1               // get word 1 of mm1 in low word of mm2
+        pmaxub  mm1, mm2            // got it down to 2 bytes
+        movq  mm2, mm1
+        psrlq  mm2, 8              // byte 1 to low byte
+        pmaxub  mm1, mm2            // our answer in low order byte
+        movd  eax, mm1
+        mov    max, al              // save answer
+
+        emms;
       }
 
-      // get min of 8 bytes in min_val
-      min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 4));
-      min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 2));
-      min_val = _mm_min_epu8(min_val, _mm_srli_si128(min_val, 1));
-      min = _mm_extract_epi8(min_val, 0);
-
-      // get max of 8 bytes in max_val
-      max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 4));
-      max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 2));
-      max_val = _mm_max_epu8(max_val, _mm_srli_si128(max_val, 1));
-      max = _mm_extract_epi8(max_val, 0);
-    }
-    // Threshold determination - compute threshold and dynamic range
-    thr = (max + min + 1) >> 1;
-    range = max - min;
-
-    max_diff = quant >> 1;
-    max_diffq[0] = max_diffq[1] = max_diffq[2] = max_diffq[3]
-      = max_diffq[4] = max_diffq[5] = max_diffq[6] = max_diffq[7]
-      = (uint8_t)max_diff;
-
-    /* To optimize in MMX it's better to always fill in the b8x8filtered[] array
-
-    b8x8filtered[8*v + h] = ( 8
-      + 1 * b10x10[stride*(v+0) + (h+0)] + 2 * b10x10[stride*(v+0) + (h+1)]
-                          + 1 * b10x10[stride*(v+0) + (h+2)]
-      + 2 * b10x10[stride*(v+1) + (h+0)] + 4 * b10x10[stride*(v+1) + (h+1)]
-                          + 2 * b10x10[stride*(v+1) + (h+2)]
-      + 1 * b10x10[stride*(v+2) + (h+0)] + 2 * b10x10[stride*(v+2) + (h+1)]
-                          + 1 * b10x10[stride*(v+2) + (h+2)]
-         >> 4;  // Nick / 16 changed to >> 4
-
-    Note - As near as I can see, (a + 2*b + c)/4 = avg( avg(a,c), b) and likewise vertical. So since
-    there is a nice pavgb MMX instruction that gives a rounded vector average we may as well use it.
-    */
-    // Fill in b10x10 array completely with  2 dim center weighted average
-    // This section now also includes the clipping step.
-    // trbarry 03/14/2002
-
-    _asm
-    {
-      mov   esi, b10x10          // ptr to 10x10 source array
-      lea   edi, b8x8filtered      // ptr to 8x8 output array
-      mov   eax, stride          // amt to bump source ptr for next row
-
-      movq  mm7, qword ptr[esi]      // this is really line -1
-      pavgb  mm7, qword ptr[esi + 2]    // avg( b[v,h], b[v,h+2] } 
-      pavgb   mm7, qword ptr[esi + 1]       // center weighted avg of 3 pixels  w=1,2,1
-
-      lea     esi, [esi + eax]        // bump src ptr to point at line 0
-      movq  mm0, qword ptr[esi]      // really line 0
-      pavgb  mm0, qword ptr[esi + 2]
-      movq    mm2, qword ptr[esi + 1]    // save orig line 0 vals for later clip
-      pavgb   mm0, mm2
-
-      movq  mm1, qword ptr[esi + eax]    // get line 1
-      pavgb  mm1, qword ptr[esi + eax + 2]
-      movq    mm3, qword ptr[esi + eax + 1]  // save orig line 1 vals for later clip
-      pavgb   mm1, mm3
-
-      // 0
-      pavgb   mm7, mm1          // avg lines surrounding line 0
-      pavgb   mm7, mm0          // center weighted avg of lines -1,0,1
-
-      movq    mm4, mm2          // value for clip min
-      psubusb mm4, max_diffq        // min
-      pmaxub  mm7, mm4          // must be at least min
-      paddusb mm2, max_diffq        // max
-      pminub  mm7, mm2          // but no greater than max
-
-      movq    qword ptr[edi], mm7
-
-      lea    esi, [esi + 2 * eax]      // bump source ptr 2 lines 
-      movq  mm2, qword ptr[esi]      // get line 2
-      pavgb  mm2, qword ptr[esi + 2]
-      movq    mm4, qword ptr[esi + 1]    // save orig line 2 vals for later clip
-      pavgb   mm2, mm4
-
-      // 1
-      pavgb   mm0, mm2          // avg lines surrounding line 1
-      pavgb   mm0, mm1          // center weighted avg of lines 0,1,2
-
-      movq    mm5, mm3          // value for clip min
-      psubusb mm5, max_diffq        // min
-      pmaxub  mm0, mm5          // must be at least min
-      paddusb mm3, max_diffq        // max
-      pminub  mm0, mm3          // but no greater than max
-
-      movq    qword ptr[edi + 8], mm0
-
-      movq  mm3, qword ptr[esi + eax]    // get line 3
-      pavgb  mm3, qword ptr[esi + eax + 2]
-      movq    mm5, qword ptr[esi + eax + 1]  // save orig line 3 vals for later clip
-      pavgb   mm3, mm5
-
-      // 2
-      pavgb   mm1, mm3          // avg lines surrounding line 2
-      pavgb   mm1, mm2          // center weighted avg of lines 1,2,3
-
-      movq    mm6, mm4          // value for clip min
-      psubusb mm6, max_diffq        // min
-      pmaxub  mm1, mm6          // must be at least min
-      paddusb mm4, max_diffq        // max
-      pminub  mm1, mm4          // but no greater than max
-
-      movq    qword ptr[edi + 16], mm1
-
-      lea    esi, [esi + 2 * eax]      // bump source ptr 2 lines
-      movq  mm4, qword ptr[esi]      // get line 4
-      pavgb  mm4, qword ptr[esi + 2]
-      movq    mm6, qword ptr[esi + 1]    // save orig line 4 vals for later clip
-      pavgb   mm4, mm6
-
-      // 3
-      pavgb   mm2, mm4          // avg lines surrounding line 3
-      pavgb   mm2, mm3          // center weighted avg of lines 2,3,4
-
-      movq    mm7, mm5          // save value for clip min
-      psubusb mm7, max_diffq        // min
-      pmaxub  mm2, mm7          // must be at least min
-      paddusb mm5, max_diffq        // max
-      pminub  mm2, mm5          // but no greater than max
-
-      movq    qword ptr[edi + 24], mm2
-
-      movq  mm5, qword ptr[esi + eax]    // get line 5
-      pavgb  mm5, qword ptr[esi + eax + 2]
-      movq    mm7, qword ptr[esi + eax + 1]  // save orig line 5 vals for later clip
-      pavgb   mm5, mm7
-
-      // 4
-      pavgb   mm3, mm5          // avg lines surrounding line 4
-      pavgb   mm3, mm4          // center weighted avg of lines 3,4,5
-
-      movq    mm0, mm6          // save value for clip min
-      psubusb mm0, max_diffq        // min
-      pmaxub  mm3, mm0          // must be at least min
-      paddusb mm6, max_diffq        // max
-      pminub  mm3, mm6          // but no greater than max
-
-      movq    qword ptr[edi + 32], mm3
-
-      lea    esi, [esi + 2 * eax]      // bump source ptr 2 lines
-      movq  mm6, qword ptr[esi]      // get line 6
-      pavgb  mm6, qword ptr[esi + 2]
-      movq    mm0, qword ptr[esi + 1]    // save orig line 6 vals for later clip
-      pavgb   mm6, mm0
-
-      // 5
-      pavgb   mm4, mm6          // avg lines surrounding line 5
-      pavgb   mm4, mm5          // center weighted avg of lines 4,5,6
-
-      movq    mm1, mm7          // save value for clip min
-      psubusb mm1, max_diffq        // min
-      pmaxub  mm4, mm1          // must be at least min
-      paddusb mm7, max_diffq        // max
-      pminub  mm4, mm7          // but no greater than max
-
-      movq    qword ptr[edi + 40], mm4
-
-      movq  mm7, qword ptr[esi + eax]    // get line 7
-      pavgb  mm7, qword ptr[esi + eax + 2]
-      movq    mm1, qword ptr[esi + eax + 1]  // save orig line 7 vals for later clip
-      pavgb   mm7, mm1
-
-      // 6
-      pavgb   mm5, mm7          // avg lines surrounding line 6
-      pavgb   mm5, mm6          // center weighted avg of lines 5,6,7
-
-      movq    mm2, mm0          // save value for clip min
-      psubusb mm2, max_diffq        // min
-      pmaxub  mm5, mm2          // must be at least min
-      paddusb mm0, max_diffq        // max
-      pminub  mm5, mm0          // but no greater than max
-
-      movq    qword ptr[edi + 48], mm5
-
-      movq  mm0, qword ptr[esi + 2 * eax]  // get line 8
-      pavgb  mm0, qword ptr[esi + 2 * eax + 2]
-      pavgb   mm0, qword ptr[esi + 2 * eax + 1]
-
-      // 7
-      pavgb   mm6, mm0          // avg lines surrounding line 7
-      pavgb   mm6, mm7          // center weighted avg of lines 6,7,8
-
-      movq    mm3, mm1          // save value for clip min
-      psubusb mm3, max_diffq        // min
-      pmaxub  mm6, mm3          // must be at least min
-      paddusb mm1, max_diffq        // max
-      pminub  mm6, mm1          // but no greater than max
-
-      movq    qword ptr[edi + 56], mm6
-
-      emms
-    }
-
-    // trbarry 03-15-2002
-    // If I (hopefully) understand all this correctly then we are supposed to only use the filtered
-    // pixels created above in the case where the orig pixel and all its 8 surrounding neighbors
-    // are either all above or all below the threshold.  Since a mmx compare sets the mmx reg
-    // bytes to either 00 or ff we will just check a lopsided average of all 9 of these to see
-    // if it is still 00 or ff.
-    // register notes:
-    // esi  b10x10
-    // edi  b8x8filtered   
-    // eax  stride
-    // mm0   line 0, 3, or 6    compare average
-    // mm1  line 1, 4, or 7      "
-    // mm2  line 2, 5, 8, or -1    "
-    // mm3  odd line original pixel value
-    // mm4  even line original pixel value
-    // mm5
-    // mm6  8 00's
-    // mm7  8 copies of threshold
-
-    _asm
-    {
-      mov   esi, b10x10          // ptr to 10x10 source array
-      lea   edi, b8x8filtered      // ptr to 8x8 output array
-      mov   eax, stride          // amt to bump source ptr for next row
-      mov    bh, thr
-      mov   bl, thr
-      psubusb mm6, mm6          // all 00
-      movd   mm7, ebx
-      pshufw  mm7, mm7, 0          // low word to all words
-
-      // get compare avg of row -1
-      movq  mm3, qword ptr[esi + 1]    // save center pixels of line -1
-
-      movq  mm2, mm7
-      psubusb  mm2, qword ptr[esi]      // left pixels >= threshold?
-      pcmpeqb mm2, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm3          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + 2]       // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      lea    esi, [esi + eax]        // &row 0
-
-      // get compare avg of row 0
-      movq  mm4, qword ptr[esi + 1]    // save center pixels 
-
-      movq  mm0, mm7
-      psubusb  mm0, qword ptr[esi]      // left pixels >= threshold?
-      pcmpeqb mm0, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm4          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm0, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + 2]       // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm0, mm5          // combine answers
-
-      // get compare avg of row 1
-
-      movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm1, mm7
-      psubusb  mm1, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm1, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm3          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm1, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm1, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 0, move them
-
-      pavgb  mm2, mm0
-      pavgb   mm2, mm1
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm2          // 00 or ff
-      pcmpeqb mm5, mm2          // mm2 = ff or 00 ? ff : 00
-      psubusb mm2, mm2          // 00
-      pcmpeqb mm2, mm5          // opposite of mm5
-      pand  mm2, mm4          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi]         // use filtered vales if thresh's same, else 00  
-      por    mm5, mm2          // one of them has a value
-      movq    qword ptr[esi + 1], mm5       // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 1
-
-      // get compare avg of row 2
-
-      movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm2, mm7
-      psubusb  mm2, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm2, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm4          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 1, move them
-
-      pavgb  mm0, mm1
-      pavgb   mm0, mm2
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm0          // 00 or ff
-      pcmpeqb mm5, mm0          // mm2 = ff or 00 ? ff : 00
-      psubusb mm0, mm0          // 00
-      pcmpeqb mm0, mm5          // opposite of mm5
-      pand  mm0, mm3          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 1 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm0          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 2
-
-      // get compare avg of row 3
-
-      movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm0, mm7
-      psubusb  mm0, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm0, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm3          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm0, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm0, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 2, move them
-
-      pavgb  mm1, mm0
-      pavgb   mm1, mm2
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm1          // 00 or ff
-      pcmpeqb mm5, mm1          // mm2 = ff or 00 ? ff : 00
-      psubusb mm1, mm1          // 00
-      pcmpeqb mm1, mm5          // opposite of mm5
-      pand  mm1, mm4          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 2 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm1          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 3
-
-      // get compare avg of row 4
-
-      movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm1, mm7
-      psubusb  mm1, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm1, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm4          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm1, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm1, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 3, move them
-
-      pavgb  mm2, mm0
-      pavgb   mm2, mm1
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm2          // 00 or ff
-      pcmpeqb mm5, mm2          // mm2 = ff or 00 ? ff : 00
-      psubusb mm2, mm2          // 00
-      pcmpeqb mm2, mm5          // opposite of mm5
-      pand  mm2, mm3          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 3 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm2          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 4
-
-      // get compare avg of row 5
-
-      movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm2, mm7
-      psubusb  mm2, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm2, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm3          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 4, move them
-
-      pavgb  mm0, mm2
-      pavgb   mm0, mm1
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm0          // 00 or ff
-      pcmpeqb mm5, mm0          // mm2 = ff or 00 ? ff : 00
-      psubusb mm0, mm0          // 00
-      pcmpeqb mm0, mm5          // opposite of mm5
-      pand  mm0, mm4          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 4 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm0          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 5
-
-      // get compare avg of row 6
-
-      movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm0, mm7
-      psubusb  mm0, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm0, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm4          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm0, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm0, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 5, move them
-
-      pavgb  mm1, mm0
-      pavgb   mm1, mm2
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm1          // 00 or ff
-      pcmpeqb mm5, mm1          // mm2 = ff or 00 ? ff : 00
-      psubusb mm1, mm1          // 00
-      pcmpeqb mm1, mm5          // opposite of mm5
-      pand  mm1, mm3          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 5 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm1          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 6
-
-      // get compare avg of row 7
-
-      movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm1, mm7
-      psubusb  mm1, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm1, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm3          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm1, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm1, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 6, move them
-
-      pavgb  mm2, mm0
-      pavgb   mm2, mm1
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm2          // 00 or ff
-      pcmpeqb mm5, mm2          // mm2 = ff or 00 ? ff : 00
-      psubusb mm2, mm2          // 00
-      pcmpeqb mm2, mm5          // opposite of mm5
-      pand  mm2, mm4          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 6 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm2          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      lea    esi, [esi + eax]        // &row 7
-
-      // get compare avg of row 8
-
-      movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
-
-      movq  mm2, mm7
-      psubusb  mm2, qword ptr[esi + eax]    // left pixels >= threshold?
-      pcmpeqb mm2, mm6          // ff if >= else 00
-
-      movq  mm5, mm7
-      psubusb mm5, mm4          // center pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      movq  mm5, mm7
-      psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
-      pcmpeqb mm5, mm6
-      pavgb   mm2, mm5          // combine answers
-
-      // decide whether to move filtered or orig pixels to row 7, move them
-
-      pavgb  mm0, mm1
-      pavgb   mm0, mm2
-      pcmpeqb mm5, mm5          // all ff
-      pcmpeqb mm5, mm0          // 00 or ff
-      pcmpeqb mm5, mm0          // mm2 = ff or 00 ? ff : 00
-      psubusb mm0, mm0          // 00
-      pcmpeqb mm0, mm5          // opposite of mm5
-      pand  mm0, mm3          // use orig vales if thresh's diff, else 00         
-      pand  mm5, qword ptr[edi + 7 * 8]     // use filtered vales if thresh's same, else 00  
-      por    mm5, mm0          // one of them has a value
-      movq    qword ptr[esi + 1], mm5     // and store 8 pixels
-
-      emms
+      /* Threshold determination - compute threshold and dynamic range */
+      thr = (max + min + 1) >> 1; // Nick / 2 changed to >> 1
+      range = max - min;
+
+      max_diff = quant >> 1;
+      max_diffq[0] = max_diffq[1] = max_diffq[2] = max_diffq[3]
+        = max_diffq[4] = max_diffq[5] = max_diffq[6] = max_diffq[7]
+        = (uint8_t)max_diff;
+
+      /* To optimize in MMX it's better to always fill in the b8x8filtered[] array
+
+      b8x8filtered[8*v + h] = ( 8
+        + 1 * b10x10[stride*(v+0) + (h+0)] + 2 * b10x10[stride*(v+0) + (h+1)]
+                            + 1 * b10x10[stride*(v+0) + (h+2)]
+        + 2 * b10x10[stride*(v+1) + (h+0)] + 4 * b10x10[stride*(v+1) + (h+1)]
+                            + 2 * b10x10[stride*(v+1) + (h+2)]
+        + 1 * b10x10[stride*(v+2) + (h+0)] + 2 * b10x10[stride*(v+2) + (h+1)]
+                            + 1 * b10x10[stride*(v+2) + (h+2)]
+           >> 4;  // Nick / 16 changed to >> 4
+
+      Note - As near as I can see, (a + 2*b + c)/4 = avg( avg(a,c), b) and likewise vertical. So since
+      there is a nice pavgb MMX instruction that gives a rounded vector average we may as well use it.
+      */
+      // Fill in b10x10 array completely with  2 dim center weighted average
+      // This section now also includes the clipping step.
+      // trbarry 03/14/2002
+
+      _asm
+      {
+        mov   esi, b10x10          // ptr to 10x10 source array
+        lea   edi, b8x8filtered      // ptr to 8x8 output array
+        mov   eax, stride          // amt to bump source ptr for next row
+
+        movq  mm7, qword ptr[esi]      // this is really line -1
+        pavgb  mm7, qword ptr[esi + 2]    // avg( b[v,h], b[v,h+2] } 
+        pavgb   mm7, qword ptr[esi + 1]       // center weighted avg of 3 pixels  w=1,2,1
+
+        lea     esi, [esi + eax]        // bump src ptr to point at line 0
+        movq  mm0, qword ptr[esi]      // really line 0
+        pavgb  mm0, qword ptr[esi + 2]
+        movq    mm2, qword ptr[esi + 1]    // save orig line 0 vals for later clip
+        pavgb   mm0, mm2
+
+        movq  mm1, qword ptr[esi + eax]    // get line 1
+        pavgb  mm1, qword ptr[esi + eax + 2]
+        movq    mm3, qword ptr[esi + eax + 1]  // save orig line 1 vals for later clip
+        pavgb   mm1, mm3
+
+        // 0
+        pavgb   mm7, mm1          // avg lines surrounding line 0
+        pavgb   mm7, mm0          // center weighted avg of lines -1,0,1
+
+        movq    mm4, mm2          // value for clip min
+        psubusb mm4, max_diffq        // min
+        pmaxub  mm7, mm4          // must be at least min
+        paddusb mm2, max_diffq        // max
+        pminub  mm7, mm2          // but no greater than max
+
+        movq    qword ptr[edi], mm7
+
+        lea    esi, [esi + 2 * eax]      // bump source ptr 2 lines 
+        movq  mm2, qword ptr[esi]      // get line 2
+        pavgb  mm2, qword ptr[esi + 2]
+        movq    mm4, qword ptr[esi + 1]    // save orig line 2 vals for later clip
+        pavgb   mm2, mm4
+
+        // 1
+        pavgb   mm0, mm2          // avg lines surrounding line 1
+        pavgb   mm0, mm1          // center weighted avg of lines 0,1,2
+
+        movq    mm5, mm3          // value for clip min
+        psubusb mm5, max_diffq        // min
+        pmaxub  mm0, mm5          // must be at least min
+        paddusb mm3, max_diffq        // max
+        pminub  mm0, mm3          // but no greater than max
+
+        movq    qword ptr[edi + 8], mm0
+
+        movq  mm3, qword ptr[esi + eax]    // get line 3
+        pavgb  mm3, qword ptr[esi + eax + 2]
+        movq    mm5, qword ptr[esi + eax + 1]  // save orig line 3 vals for later clip
+        pavgb   mm3, mm5
+
+        // 2
+        pavgb   mm1, mm3          // avg lines surrounding line 2
+        pavgb   mm1, mm2          // center weighted avg of lines 1,2,3
+
+        movq    mm6, mm4          // value for clip min
+        psubusb mm6, max_diffq        // min
+        pmaxub  mm1, mm6          // must be at least min
+        paddusb mm4, max_diffq        // max
+        pminub  mm1, mm4          // but no greater than max
+
+        movq    qword ptr[edi + 16], mm1
+
+        lea    esi, [esi + 2 * eax]      // bump source ptr 2 lines
+        movq  mm4, qword ptr[esi]      // get line 4
+        pavgb  mm4, qword ptr[esi + 2]
+        movq    mm6, qword ptr[esi + 1]    // save orig line 4 vals for later clip
+        pavgb   mm4, mm6
+
+        // 3
+        pavgb   mm2, mm4          // avg lines surrounding line 3
+        pavgb   mm2, mm3          // center weighted avg of lines 2,3,4
+
+        movq    mm7, mm5          // save value for clip min
+        psubusb mm7, max_diffq        // min
+        pmaxub  mm2, mm7          // must be at least min
+        paddusb mm5, max_diffq        // max
+        pminub  mm2, mm5          // but no greater than max
+
+        movq    qword ptr[edi + 24], mm2
+
+        movq  mm5, qword ptr[esi + eax]    // get line 5
+        pavgb  mm5, qword ptr[esi + eax + 2]
+        movq    mm7, qword ptr[esi + eax + 1]  // save orig line 5 vals for later clip
+        pavgb   mm5, mm7
+
+        // 4
+        pavgb   mm3, mm5          // avg lines surrounding line 4
+        pavgb   mm3, mm4          // center weighted avg of lines 3,4,5
+
+        movq    mm0, mm6          // save value for clip min
+        psubusb mm0, max_diffq        // min
+        pmaxub  mm3, mm0          // must be at least min
+        paddusb mm6, max_diffq        // max
+        pminub  mm3, mm6          // but no greater than max
+
+        movq    qword ptr[edi + 32], mm3
+
+        lea    esi, [esi + 2 * eax]      // bump source ptr 2 lines
+        movq  mm6, qword ptr[esi]      // get line 6
+        pavgb  mm6, qword ptr[esi + 2]
+        movq    mm0, qword ptr[esi + 1]    // save orig line 6 vals for later clip
+        pavgb   mm6, mm0
+
+        // 5
+        pavgb   mm4, mm6          // avg lines surrounding line 5
+        pavgb   mm4, mm5          // center weighted avg of lines 4,5,6
+
+        movq    mm1, mm7          // save value for clip min
+        psubusb mm1, max_diffq        // min
+        pmaxub  mm4, mm1          // must be at least min
+        paddusb mm7, max_diffq        // max
+        pminub  mm4, mm7          // but no greater than max
+
+        movq    qword ptr[edi + 40], mm4
+
+        movq  mm7, qword ptr[esi + eax]    // get line 7
+        pavgb  mm7, qword ptr[esi + eax + 2]
+        movq    mm1, qword ptr[esi + eax + 1]  // save orig line 7 vals for later clip
+        pavgb   mm7, mm1
+
+        // 6
+        pavgb   mm5, mm7          // avg lines surrounding line 6
+        pavgb   mm5, mm6          // center weighted avg of lines 5,6,7
+
+        movq    mm2, mm0          // save value for clip min
+        psubusb mm2, max_diffq        // min
+        pmaxub  mm5, mm2          // must be at least min
+        paddusb mm0, max_diffq        // max
+        pminub  mm5, mm0          // but no greater than max
+
+        movq    qword ptr[edi + 48], mm5
+
+        movq  mm0, qword ptr[esi + 2 * eax]  // get line 8
+        pavgb  mm0, qword ptr[esi + 2 * eax + 2]
+        pavgb   mm0, qword ptr[esi + 2 * eax + 1]
+
+        // 7
+        pavgb   mm6, mm0          // avg lines surrounding line 7
+        pavgb   mm6, mm7          // center weighted avg of lines 6,7,8
+
+        movq    mm3, mm1          // save value for clip min
+        psubusb mm3, max_diffq        // min
+        pmaxub  mm6, mm3          // must be at least min
+        paddusb mm1, max_diffq        // max
+        pminub  mm6, mm1          // but no greater than max
+
+        movq    qword ptr[edi + 56], mm6
+
+        emms
+      }
+
+      // trbarry 03-15-2002
+      // If I (hopefully) understand all this correctly then we are supposed to only use the filtered
+      // pixels created above in the case where the orig pixel and all its 8 surrounding neighbors
+      // are either all above or all below the threshold.  Since a mmx compare sets the mmx reg
+      // bytes to either 00 or ff we will just check a lopsided average of all 9 of these to see
+      // if it is still 00 or ff.
+      // register notes:
+      // esi  b10x10
+      // edi  b8x8filtered   
+      // eax  stride
+      // mm0   line 0, 3, or 6    compare average
+      // mm1  line 1, 4, or 7      "
+      // mm2  line 2, 5, 8, or -1    "
+      // mm3  odd line original pixel value
+      // mm4  even line original pixel value
+      // mm5
+      // mm6  8 00's
+      // mm7  8 copies of threshold
+
+      _asm
+      {
+        mov   esi, b10x10          // ptr to 10x10 source array
+        lea   edi, b8x8filtered      // ptr to 8x8 output array
+        mov   eax, stride          // amt to bump source ptr for next row
+        mov    bh, thr
+        mov   bl, thr
+        psubusb mm6, mm6          // all 00
+        movd   mm7, ebx
+        pshufw  mm7, mm7, 0          // low word to all words
+
+        // get compare avg of row -1
+        movq  mm3, qword ptr[esi + 1]    // save center pixels of line -1
+
+        movq  mm2, mm7
+        psubusb  mm2, qword ptr[esi]      // left pixels >= threshold?
+        pcmpeqb mm2, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm3          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + 2]       // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        lea    esi, [esi + eax]        // &row 0
+
+        // get compare avg of row 0
+        movq  mm4, qword ptr[esi + 1]    // save center pixels 
+
+        movq  mm0, mm7
+        psubusb  mm0, qword ptr[esi]      // left pixels >= threshold?
+        pcmpeqb mm0, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm4          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm0, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + 2]       // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm0, mm5          // combine answers
+
+        // get compare avg of row 1
+
+        movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm1, mm7
+        psubusb  mm1, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm1, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm3          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm1, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm1, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 0, move them
+
+        pavgb  mm2, mm0
+        pavgb   mm2, mm1
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm2          // 00 or ff
+        pcmpeqb mm5, mm2          // mm2 = ff or 00 ? ff : 00
+        psubusb mm2, mm2          // 00
+        pcmpeqb mm2, mm5          // opposite of mm5
+        pand  mm2, mm4          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi]         // use filtered vales if thresh's same, else 00  
+        por    mm5, mm2          // one of them has a value
+        movq    qword ptr[esi + 1], mm5       // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 1
+
+        // get compare avg of row 2
+
+        movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm2, mm7
+        psubusb  mm2, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm2, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm4          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 1, move them
+
+        pavgb  mm0, mm1
+        pavgb   mm0, mm2
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm0          // 00 or ff
+        pcmpeqb mm5, mm0          // mm2 = ff or 00 ? ff : 00
+        psubusb mm0, mm0          // 00
+        pcmpeqb mm0, mm5          // opposite of mm5
+        pand  mm0, mm3          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 1 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm0          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 2
+
+        // get compare avg of row 3
+
+        movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm0, mm7
+        psubusb  mm0, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm0, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm3          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm0, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm0, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 2, move them
+
+        pavgb  mm1, mm0
+        pavgb   mm1, mm2
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm1          // 00 or ff
+        pcmpeqb mm5, mm1          // mm2 = ff or 00 ? ff : 00
+        psubusb mm1, mm1          // 00
+        pcmpeqb mm1, mm5          // opposite of mm5
+        pand  mm1, mm4          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 2 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm1          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 3
+
+        // get compare avg of row 4
+
+        movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm1, mm7
+        psubusb  mm1, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm1, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm4          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm1, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm1, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 3, move them
+
+        pavgb  mm2, mm0
+        pavgb   mm2, mm1
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm2          // 00 or ff
+        pcmpeqb mm5, mm2          // mm2 = ff or 00 ? ff : 00
+        psubusb mm2, mm2          // 00
+        pcmpeqb mm2, mm5          // opposite of mm5
+        pand  mm2, mm3          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 3 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm2          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 4
+
+        // get compare avg of row 5
+
+        movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm2, mm7
+        psubusb  mm2, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm2, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm3          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 4, move them
+
+        pavgb  mm0, mm2
+        pavgb   mm0, mm1
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm0          // 00 or ff
+        pcmpeqb mm5, mm0          // mm2 = ff or 00 ? ff : 00
+        psubusb mm0, mm0          // 00
+        pcmpeqb mm0, mm5          // opposite of mm5
+        pand  mm0, mm4          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 4 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm0          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 5
+
+        // get compare avg of row 6
+
+        movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm0, mm7
+        psubusb  mm0, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm0, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm4          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm0, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm0, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 5, move them
+
+        pavgb  mm1, mm0
+        pavgb   mm1, mm2
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm1          // 00 or ff
+        pcmpeqb mm5, mm1          // mm2 = ff or 00 ? ff : 00
+        psubusb mm1, mm1          // 00
+        pcmpeqb mm1, mm5          // opposite of mm5
+        pand  mm1, mm3          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 5 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm1          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 6
+
+        // get compare avg of row 7
+
+        movq  mm3, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm1, mm7
+        psubusb  mm1, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm1, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm3          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm1, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm1, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 6, move them
+
+        pavgb  mm2, mm0
+        pavgb   mm2, mm1
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm2          // 00 or ff
+        pcmpeqb mm5, mm2          // mm2 = ff or 00 ? ff : 00
+        psubusb mm2, mm2          // 00
+        pcmpeqb mm2, mm5          // opposite of mm5
+        pand  mm2, mm4          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 6 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm2          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        lea    esi, [esi + eax]        // &row 7
+
+        // get compare avg of row 8
+
+        movq  mm4, qword ptr[esi + eax + 1]  // save center pixels 
+
+        movq  mm2, mm7
+        psubusb  mm2, qword ptr[esi + eax]    // left pixels >= threshold?
+        pcmpeqb mm2, mm6          // ff if >= else 00
+
+        movq  mm5, mm7
+        psubusb mm5, mm4          // center pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        movq  mm5, mm7
+        psubusb mm5, qword ptr[esi + eax + 2]   // right pixels >= threshold?
+        pcmpeqb mm5, mm6
+        pavgb   mm2, mm5          // combine answers
+
+        // decide whether to move filtered or orig pixels to row 7, move them
+
+        pavgb  mm0, mm1
+        pavgb   mm0, mm2
+        pcmpeqb mm5, mm5          // all ff
+        pcmpeqb mm5, mm0          // 00 or ff
+        pcmpeqb mm5, mm0          // mm2 = ff or 00 ? ff : 00
+        psubusb mm0, mm0          // 00
+        pcmpeqb mm0, mm5          // opposite of mm5
+        pand  mm0, mm3          // use orig vales if thresh's diff, else 00         
+        pand  mm5, qword ptr[edi + 7 * 8]     // use filtered vales if thresh's same, else 00  
+        por    mm5, mm0          // one of them has a value
+        movq    qword ptr[esi + 1], mm5     // and store 8 pixels
+
+        emms
+      }
     }
   }
 }
-
 #endif
 
 void dering(uint8_t* image, int height, int width, int quant) {
