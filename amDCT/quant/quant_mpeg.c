@@ -99,8 +99,7 @@ quant_mpeg_intra_c(int16_t* coeff,
  * sum += abs(level);
  */
 
-uint32_t
-quant_mpeg_inter_c(int16_t* coeff,
+uint32_t quant_mpeg_inter_c(int16_t* coeff,
   const int16_t* data,
   const uint32_t quant,
   const uint16_t* mpeg_quant_matrices)
@@ -108,31 +107,25 @@ quant_mpeg_inter_c(int16_t* coeff,
   const uint32_t mult = multipliers[quant];
   const uint16_t* inter_matrix = get_inter_matrix(mpeg_quant_matrices);
   uint32_t sum = 0;
-  int i;
 
-  for (i = 0; i < 64; i++) {
-    if (data[i] < 0) {
-      uint32_t level = -data[i];
-
-      level = ((level << 4) + (inter_matrix[i] >> 1)) / inter_matrix[i];
-      level = (level * mult) >> 17;
-      sum += level;
-      coeff[i] = -(int16_t)level;
-    }
-    else if (data[i] > 0) {
-      uint32_t level = data[i];
+  for (int i = 0; i < 64; i++) {
+    if (data[i] != 0) {
+      uint32_t level = (data[i] < 0) ? -data[i] : data[i];
 
       level = ((level << 4) + (inter_matrix[i] >> 1)) / inter_matrix[i];
+      // Note: Since there is no integer division in assembler code
+      // this part works by a different magic there, using a sub-table
+      // in mpeg_quant_matrices for inverse division constants
       level = (level * mult) >> 17;
       sum += level;
-      coeff[i] = (int16_t)level;
+      coeff[i] = (data[i] < 0) ? -(int16_t)level : (int16_t)level;
     }
     else {
       coeff[i] = 0;
     }
   }
 
-  return(sum);
+  return sum;
 }
 
 /* dequantize intra-block & clamp to [-2048,2047]
