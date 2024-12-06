@@ -22,7 +22,7 @@
 #include "dct\fdct.h"
 #include "quant\quant_matrix.h"
 
-// temporarily we don't have external nasm comiled idct and fdct asm code
+// temporarily we don't have external nasm compiled quant-dequant asm code
 #define USE_NEW_INTRINSICS_DCTLOOP
 
 void init_intra_matrixF(uint16_t* mpeg_quant_matrices, float quant);
@@ -201,13 +201,8 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
               /*
                *  2: DO DCT ON THE BLOCK.
                */
-               // FIXME: until external asm source is re-inserted in project.
-               // Originally called fdct_sse2_skal asm, now fdct_int32 instead.
-      fdct_int32(dct_block);       // C version for testing.
-      //fdct_mmx_ffmpeg(dct_block);  // This mmx version works.
-      //fdct_mmx_skal(dct_block);    // This mmx version is faster.
-      //fdct_xmm_ffmpeg(dct_block);  // This xmm version also works even faster.                        
-      //fdct_sse2_skal(dct_block);     // This sse2 is the fastest.  
+      //fdct_int32(dct_block);       // C version for testing.
+      fdct_sse2(dct_block);       // based on fdct_sse2_skal
 
       if (showMask == 18 || showMask == 19) {
         memcpy(dct_blockOrig, dct_block, blockSize);
@@ -441,13 +436,9 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
       /*
        *  4: DO iDCT ON THE BLOCK
        */
-       // temporarily use C (simple_idct_c) instead of external asm idct_sse2_skal
              //idct_int32(dct_block);      // C version for testing.
-      simple_idct_c(dct_block);   // C version for testing. (more precise)
-      //idct_mmx(dct_block);        // This works.
-      //idct_xmm(dct_block);        // This works faster.
-      //idct_sse2_skal(dct_block);    // This works fastest.
-
+      //simple_idct_c(dct_block);   // C version for testing. (more precise)
+      idct_sse2(dct_block);    // based on idct_sse2_skal
 
 
 

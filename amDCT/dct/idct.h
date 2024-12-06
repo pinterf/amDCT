@@ -28,31 +28,17 @@
 
 #include "../amDCTPortab.h"
 
-void idct_int32_init();
-void idct_ia64_init();
-
 typedef void (idctFunc)(short* const block);
 typedef idctFunc* idctFuncPtr;
 
 extern idctFuncPtr idct;
 
-idctFunc idct_int32;
-idctFunc simple_idct_c;    /* Michael Niedermayer */
+// C versions are not identical to SSE2
+idctFunc idct_int32; // better use this one if 
+idctFunc simple_idct_c; // Michael Niedermayer
 
 #if defined(ARCH_IS_IA32) || defined(ARCH_IS_X86_64)
-idctFunc idct_mmx;      /* AP-992, Peter Gubanov, Michel Lespinasse */
-idctFunc idct_xmm;      /* AP-992, Peter Gubanov, Michel Lespinasse */
-idctFunc idct_3dne;      /* AP-992, Peter Gubanov, Michel Lespinasse, Jaan Kalda */
-idctFunc idct_sse2_skal;  /* Skal's one, IEEE 1180 compliant */
-idctFunc idct_sse2_dmitry;  /* Dmitry Rozhdestvensky */
-#endif
-
-#ifdef ARCH_IS_IA64
-idctFunc idct_ia64;
-#endif
-
-#ifdef ARCH_IS_PPC
-idctFunc idct_altivec_c;
+idctFunc idct_sse2; // converted from skal version, IEEE 1180 compliant */
 #endif
 
 #endif              /* _IDCT_H_ */

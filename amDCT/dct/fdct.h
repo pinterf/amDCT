@@ -34,17 +34,8 @@ typedef fdctFunc *fdctFuncPtr;
 extern fdctFuncPtr fdct;
 
 fdctFunc fdct_int32;
-
 #if defined(ARCH_IS_IA32) || defined(ARCH_IS_X86_64)
-fdctFunc fdct_mmx_ffmpeg;
-fdctFunc fdct_xmm_ffmpeg;
-fdctFunc fdct_mmx_skal;
-fdctFunc fdct_xmm_skal;
-fdctFunc fdct_sse2_skal;
-#endif
-
-#ifdef ARCH_IS_IA64
-fdctFunc fdct_ia64;
+fdctFunc fdct_sse2;
 #endif
 
 #endif              /* _FDCT_H_ */

@@ -288,7 +288,9 @@
     <ClCompile Include="BuildPreCompVals.c" />
     <ClCompile Include="DctLoop.c" />
     <ClCompile Include="dct\fdct.c" />
+    <ClCompile Include="dct\fdct_sse2.c" />
     <ClCompile Include="dct\idct.c" />
+    <ClCompile Include="dct\idct_sse2.c" />
     <ClCompile Include="dct\simple_idct.c" />
     <ClCompile Include="DispatchLoop.c" />
     <ClCompile Include="FitRange.c" />
