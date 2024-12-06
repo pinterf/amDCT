@@ -303,6 +303,7 @@
     <ClCompile Include="quant\quant_h263.c" />
     <ClCompile Include="quant\quant_matrix.c" />
     <ClCompile Include="quant\quant_mpeg.c" />
+    <ClCompile Include="quant\quant_mpeg_sse.c" />
     <ClCompile Include="Sharp.c" />
     <ClCompile Include="smoothFilters.c" />
     <ClCompile Include="Threading.c" />

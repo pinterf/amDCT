@@ -19,6 +19,7 @@ void quantDequant_xmm(int16_t* dct_block, const uint16_t* qtype1_matrix, const u
 void quantDequant_sse2(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant);
 void quantDequant_c(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant);
 
+void quantDequant_shift14_c(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant);
 
 void DctLoop(int starti, int startj, DctLoop_args* args);
 

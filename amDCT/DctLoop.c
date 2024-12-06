@@ -325,10 +325,9 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
           break;
 
         case 3:
-#ifdef USE_NEW_INTRINSICS_DCTLOOP
-          // _c instead of asm FIXME: implement sse2 x64 friendly
-          quant_mpeg_inter_c(coeff_block, dct_block, quant, quant_inter_matrix);
-          dequant_mpeg_inter_c(dct_block, coeff_block, quant, quant_inter_matrix);
+#ifdef USE_NEW_INTRINSICS
+          quant_mpeg_inter_ssse3(coeff_block, dct_block, quant, quant_inter_matrix);
+          dequant_mpeg_inter_sse41(dct_block, coeff_block, quant, quant_inter_matrix);
 #else
           quant_mpeg_inter_mmx(coeff_block, dct_block, quant, quant_inter_matrix);
           dequant_mpeg_inter_mmx(dct_block, coeff_block, quant, quant_inter_matrix);

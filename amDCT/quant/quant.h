@@ -26,7 +26,6 @@
 #ifndef _QUANT_H_
 #define _QUANT_H_
 
- //#include "../portab.h"
 #include <stdint.h>  
 
 /*****************************************************************************
@@ -63,14 +62,6 @@ quant_intraFunc quant_h263_intra_sse2;
 quant_intraFunc quant_mpeg_intra_mmx;
 #endif
 
-#ifdef ARCH_IS_IA64
-quant_intraFunc quant_h263_intra_ia64;
-#endif
-
-#ifdef ARCH_IS_PPC
-quant_intraFunc quant_h263_intra_altivec_c;
-#endif
-
 /* DeQuant functions */
 quant_intraFunc dequant_h263_intra_c;
 quant_intraFunc dequant_mpeg_intra_c;
@@ -85,14 +76,6 @@ quant_intraFunc dequant_mpeg_intra_mmx;
 quant_intraFunc dequant_mpeg_intra_3dne;
 #endif
 
-#ifdef ARCH_IS_IA64
-quant_intraFunc dequant_h263_intra_ia64;
-#endif
-
-#ifdef ARCH_IS_PPC
-quant_intraFunc dequant_h263_intra_altivec_c;
-quant_intraFunc dequant_mpeg_intra_altivec_c;
-#endif
 
 /*****************************************************************************
  * Common API for Inter (de)Quant functions
@@ -117,44 +100,24 @@ extern quant_interFuncPtr dequant_mpeg_inter;
 
 quant_interFunc quant_h263_inter_c;
 quant_interFunc quant_mpeg_inter_c;
+quant_interFunc quant_mpeg_inter_ssse3;
 
 #if defined(ARCH_IS_IA32) || defined(ARCH_IS_X86_64)
 quant_interFunc quant_h263_inter_mmx;
 quant_interFunc quant_h263_inter_3dne;
 quant_interFunc quant_h263_inter_sse2;
-
-quant_interFunc quant_mpeg_inter_mmx;
-quant_interFunc quant_mpeg_inter_xmm;
-#endif
-
-#ifdef ARCH_IS_IA64
-quant_interFunc quant_h263_inter_ia64;
-#endif
-
-#ifdef ARCH_IS_PPC
-quant_interFunc quant_h263_inter_altivec_c;
 #endif
 
 quant_interFunc dequant_h263_inter_c;
 quant_interFunc dequant_mpeg_inter_c;
+quant_interFunc dequant_mpeg_inter_sse41;
 
 #if defined(ARCH_IS_IA32) || defined(ARCH_IS_X86_64)
 quant_interFunc dequant_h263_inter_mmx;
 quant_interFunc dequant_h263_inter_xmm;
 quant_interFunc dequant_h263_inter_3dne;
 quant_interFunc dequant_h263_inter_sse2;
-
-quant_interFunc dequant_mpeg_inter_mmx;
-quant_interFunc dequant_mpeg_inter_3dne;
 #endif
 
-#ifdef ARCH_IS_IA64
-quant_interFunc dequant_h263_inter_ia64;
-#endif
-
-#ifdef ARCH_IS_PPC
-quant_interFunc dequant_h263_inter_altivec_c;
-quant_interFunc dequant_mpeg_inter_altivec_c;
-#endif
 
 #endif /* _QUANT_H_ */
