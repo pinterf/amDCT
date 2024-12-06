@@ -1217,7 +1217,7 @@ void deblock_vert_default_filter(uint8_t* v, int stride, int QP) {
   }
   /* add d to rows l4 and l5 in memory... */
   uint8_t* pmm1 = &(v[4 * stride]);
-  mm6 = _mm_packs_epi16(mm6, mm1);
+  mm6 = _mm_packs_epi16(mm6, mm1); // no panic on warning, mm6 was filled in the first i==0 loop
   // Shuffle the packed result to place the second argument's packed values in the correct position
   // since the original MMX case packed the second argument's 0-63 into the target's 32-63 bits
   mm6 = _mm_shuffle_epi32(mm6, _MM_SHUFFLE(3, 1, 2, 0));

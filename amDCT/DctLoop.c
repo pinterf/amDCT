@@ -173,14 +173,6 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
         continue;
       }
 
-      // SPEEED TEST 
-       /*
-        transfer8x8_copy_mmx(BF_accumP, BF_workP, rowStride);
-        BF_accumP  += BLKSIZE;
-        BF_workP   += BLKSIZE;
-        continue;
-        */
-        // END SPEED TEST
 
         // NOTE: Most of the mmx/xmm/sse2 routines and C equivalents are from XVID.  Thank You XVID.
         //       I tested the available XVID routines for each section of the algorithm.
@@ -195,8 +187,6 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
       qtype = args->qtype;
 
 
-
-      //goto speedTest;  // Uncomment this AND THE SPEEDTEST label  to test speed without doing the fdct, quant, dequant, idct calls.  label
 
               /*
                *  2: DO DCT ON THE BLOCK.
@@ -421,7 +411,7 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
       /*
        *  4: DO iDCT ON THE BLOCK
        */
-             //idct_int32(dct_block);      // C version for testing.
+      //idct_int32(dct_block);      // C version for testing.
       //simple_idct_c(dct_block);   // C version for testing. (more precise)
       idct_sse2(dct_block);    // based on idct_sse2_skal
 
@@ -469,7 +459,6 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
       _mm_empty();
 #endif
 
-      // speedTest:    //  NOTE UNCOMMENT IF DOING INNER LOOP  BYPASS SPEED TEST
               /*
                *     5: ADD BLOCK VALUES TO THOSE IN BF_workP
                * Note that the values in dct_block are not in 0-255 range.

@@ -113,12 +113,6 @@ set_matrix(FrameInfo_args* FrameInfoArgs, uint8_t matrix_Num, uint8_t qtype, uin
     FrameInfoArgs->qtype = qtype;
   }
 
-  //  if (qtype == 1 &&  matrixHasLT18 == 1) {
-  //    qtype = 11;
-  //    FrameInfoArgs->qtype = qtype;
-  //  }
-
-
   if (use_quant < min_quant) {
     use_quant = min_quant;
     FrameInfoArgs->quant = use_quant;
