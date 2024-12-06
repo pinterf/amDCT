@@ -303,10 +303,13 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
          */
         switch (qtype) {
         case 1:
-          // I couldn't get quant_mpeg_intra_mmx() to work so I wrote a merged quant-dequant in xmm
+          // I (original author) couldn't get quant_mpeg_intra_mmx() to work so I wrote a merged quant-dequant in xmm
           // An optimized c version qtype=11 is automatically used if the xmm version would overflow.
           dbzero = dct_block[0];
           quantDequant(dct_block, qtype1_matrix, qtype1_matrix_quant);
+          // instead of quant_mpeg_intra_mmx dequant_mpeg_intra_mmx pair
+          // FIXME: check if same, figure out how to reach here, qtype=1 in changed to qtype=11 if some conditions apply
+          //quantDequant_c(dct_block, qtype11_matrix, qtype11_matrix_quant);
           dct_block[0] = dbzero;
           break;
 
@@ -349,26 +352,9 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
           // These are the C versions which are included for testing.
           // NOTE case 11 is required to process qtype=1 for Matrices with 1's in them.      
         case 11:
-          //quantDequant_C:
-          // The xvid algorithm used 
-          // SCALEBITS = 17
-          // dct_block[] values run from -32768 to 32767
-          // rounding = 1<<(SCALEBITS-1-3)
-          // level    = (level * qtype1_matrix[i] + rounding)>>(SCALEBITS-3); 
-          // 8192     = 32768 >> 2
+          // with differently scaled shift and rounder
+          quantDequant_shift14_c(dct_block, qtype11_matrix, qtype11_matrix_quant);
 
-          for (int i = 1; i < 64; i++) {
-            int32_t level = dct_block[i];    // dct_block[] values run from -32768 to 32767
-
-            if (level == 0) continue;
-
-            level = (level * qtype11_matrix[i] + 8192) >> 14;
-
-            if (level == 0)
-              dct_block[i] = 0;
-            else
-              dct_block[i] = (int16_t)(level * qtype11_matrix_quant[i]) >> 3;
-          }
           break;
 
         case 12:
@@ -781,6 +767,33 @@ void quantDequant_c(int16_t* dct_block, const uint16_t* qtype1_matrix, const uin
   }
 }
 
+// passes qtype11_matrix_quant instead of qtype1_matrix_quant
+// and qtype11_matrix instead of qtype1_matrix
+void quantDequant_shift14_c(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant)
+{
+  //quantDequant_C:
+// The xvid algorithm used 
+// SCALEBITS = 17
+// dct_block[] values run from -32768 to 32767
+// rounding = 1<<(SCALEBITS-1-3)
+// level    = (level * qtype1_matrix[i] + rounding)>>(SCALEBITS-3); 
+// 8192     = 32768 >> 2
+
+// why not this one called: quantDequant_c(dct_block, qtype11_matrix, qtype11_matrix_quant);
+// Because qtype11 matrix is /4 what quantDequant_c would expect
+  for (int i = 1; i < 64; i++) {
+    int32_t level = dct_block[i];    // dct_block[] values run from -32768 to 32767
+
+    if (level == 0) continue;
+
+    level = (level * qtype1_matrix[i] + 8192) >> 14;
+
+    if (level == 0)
+      dct_block[i] = 0;
+    else
+      dct_block[i] = (int16_t)(level * qtype1_matrix_quant[i]) >> 3;
+  }
+}
 
 __forceinline void quantDequant(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
 #ifdef USE_NEW_INTRINSICS
