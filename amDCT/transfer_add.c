@@ -3,36 +3,11 @@
 #include "transfer_add.h"
 #include <smmintrin.h> // SSE4.2
 
-void test_copy_add_16to16_c(uint16_t* dst, uint16_t* src, uint32_t len) {
+void copy_add_16to16_c(uint16_t* dst, uint16_t* src, uint32_t len) {
   uint32_t x;
-
   for (x = 0; x < len; x++) {
     dst[x] = (uint16_t)(src[x] + dst[x]);
   }
-
-  return;
-}
-
-void test2_copy_add_16to16_c(uint16_t* dst, uint16_t* src, uint32_t len) {
-  uint32_t x;
-  uint32_t temp;
-
-  for (x = 0; x < len; x++) {
-    //temp = (uint16_t)(src[x] + dst[x]);
-    temp = (uint32_t)(src[x] + dst[x]);
-
-    if (temp < 0) {
-      temp = 1;
-    }
-
-    if (temp > 254) {
-      temp = 254;
-    }
-
-    dst[x] = (uint8_t)temp;
-  }
-
-  return;
 }
 
 // dst: block[64], 8x8 uint16_t
@@ -147,6 +122,7 @@ void copy_add_16to16(uint16_t* dst, uint16_t* const src, int32_t len) {
 #else
   copy_add_16to16_xmm(dst, src, len);
 #endif
+  //copy_add_16to16_c(dst, src, len);
 }
 
 
@@ -221,6 +197,15 @@ void copy_add_16to16_xmm(uint16_t* dst, uint16_t* const src, int32_t len) {
 }
 #endif
 
+void copy_add3_16to16_c(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
+  uint32_t num_iterations = len / 16;
+
+  for (uint32_t i = 0; i < num_iterations; ++i) {
+    for (uint32_t j = 0; j < 16; ++j) {
+      dst[i * 16 + j] = dst[i * 16 + j] + src1[i * 16 + j] + src2[i * 16 + j];
+    }
+  }
+}
 
 void copy_add3_16to16(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
 #ifdef USE_NEW_INTRINSICS
@@ -228,6 +213,7 @@ void copy_add3_16to16(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t le
 #else
   copy_add3_16to16_xmm(dst, src1, src2, len);
 #endif
+  //copy_add3_16to16_c(dst, src1, src2, len);
 }
 
 void copy_add3_16to16_sse2(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
@@ -420,12 +406,42 @@ void copy_add4_16to16_mmx(uint16_t* dst, uint16_t* const src1, uint16_t* const s
 }
 #endif
 
-void copy_add4_16to16_c(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
-  uint32_t x;
+void copy_add4_16to16(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
+  copy_add4_16to16_sse2(dst, src1, src2, src3, len);
+  // copy_add4_16to16_c(dst, src1, src2, src3, len);
+}
 
-  for (x = 0; x < len; x++) {
-    dst[x] = (uint16_t)(dst[x] + src1[x] + src2[x] + src3[x]);
+void copy_add4_16to16_sse2(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
+  __m128i* dst_ptr = (__m128i*)dst;
+  __m128i* src1_ptr = (__m128i*)src1;
+  __m128i* src2_ptr = (__m128i*)src2;
+  __m128i* src3_ptr = (__m128i*)src3;
+  uint32_t num_iterations = len / 8;
+
+  // Each __m128i can hold 8 uint16_t values
+  // len is mod8 ?? if so, the final copy can be omitted
+
+  for (uint32_t i = 0; i < num_iterations; ++i) {
+    __m128i xmm0 = _mm_load_si128(&dst_ptr[i]);
+    __m128i xmm1 = _mm_load_si128(&src1_ptr[i]);
+    __m128i xmm2 = _mm_load_si128(&src2_ptr[i]);
+    __m128i xmm3 = _mm_load_si128(&src3_ptr[i]);
+
+    xmm0 = _mm_add_epi16(xmm0, xmm1);
+    xmm0 = _mm_add_epi16(xmm0, xmm2);
+    xmm0 = _mm_add_epi16(xmm0, xmm3);
+
+    _mm_store_si128(&dst_ptr[i], xmm0);
   }
 
-  return;
+  // Handle any remaining elements
+  for (uint32_t i = num_iterations * 8; i < len; ++i) {
+    dst[i] = (uint16_t)(dst[i] + src1[i] + src2[i] + src3[i]);
+  }
+}
+
+void copy_add4_16to16_c(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
+  for (uint32_t x = 0; x < len; x++) {
+    dst[x] = (uint16_t)(dst[x] + src1[x] + src2[x] + src3[x]);
+  }
 }
