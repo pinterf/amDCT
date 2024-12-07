@@ -146,7 +146,6 @@ uint32_t quant_h263_inter_sse2(int16_t* coeff, const int16_t* data, uint32_t qua
 
 uint32_t dequant_h263_inter_sse2(int16_t* data, const int16_t* const coeff, const uint32_t quant, const uint16_t* mpeg_matrices) {
   
-  __m128i xmm6, xmm7, xmm4, xmm5;
   __m128i* pcoeff = (__m128i*)coeff;
   __m128i* pdata = (__m128i*)data;
 
@@ -162,8 +161,7 @@ uint32_t dequant_h263_inter_sse2(int16_t* data, const int16_t* const coeff, cons
   __m128i quant_adj = _mm_sub_epi16(quant_val, _mm_set1_epi16((short)adjusted_quant));
 
   for (int i = 0; i < 8; ++i) {
-    __m128i xmm0, xmm2, xmm3;
-
+    
     // Load coefficients
     __m128i vals = _mm_load_si128(&pcoeff[i]);
 

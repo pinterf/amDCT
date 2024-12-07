@@ -23,11 +23,9 @@
  *
  ****************************************************************************/
 
- //#include "../global.h"  // Only need DIV_DIV 
- // Copied DIV_DIV from xvid global.h file
-#define DIV_DIV(a,b)    (((a)>0) ? ((a)+((b)>>1))/(b) : ((a)-((b)>>1))/(b))
 #include "quant.h"
 
+#define DIV_DIV(a,b)    (((a)>0) ? ((a)+((b)>>1))/(b) : ((a)-((b)>>1))/(b))
 
 /*****************************************************************************
  * Global function pointers
@@ -70,8 +68,7 @@ static const uint32_t multipliers[32] =
  /*  quantize intra-block
   */
 
-uint32_t
-quant_h263_intra_c(int16_t* coeff,
+uint32_t quant_h263_intra_c(int16_t* coeff,
   const int16_t* data,
   const uint32_t quant,
   const uint32_t dcscalar,
@@ -113,8 +110,7 @@ quant_h263_intra_c(int16_t* coeff,
 /*  quantize inter-block
  */
 
-uint32_t
-quant_h263_inter_c(int16_t* coeff,
+uint32_t quant_h263_inter_c(int16_t* coeff,
   const int16_t* data,
   const uint32_t quant,
   const uint16_t* mpeg_quant_matrices)
@@ -159,8 +155,7 @@ quant_h263_inter_c(int16_t* coeff,
 /*  dequantize intra-block & clamp to [-2048,2047]
  */
 
-uint32_t
-dequant_h263_intra_c(int16_t* data,
+uint32_t dequant_h263_intra_c(int16_t* data,
   const int16_t* coeff,
   const uint32_t quant,
   const uint32_t dcscalar,
@@ -203,8 +198,7 @@ dequant_h263_intra_c(int16_t* data,
 /* dequantize inter-block & clamp to [-2048,2047]
  */
 
-uint32_t
-dequant_h263_inter_c(int16_t* data,
+uint32_t dequant_h263_inter_c(int16_t* data,
   const int16_t* coeff,
   const uint32_t quant,
   const uint16_t* mpeg_quant_matrices)

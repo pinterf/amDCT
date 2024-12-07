@@ -20,8 +20,7 @@ void init_matrix_Vals(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix
 // to the next when block adaptive processing is activated.
 //
 // This is only used in set_matrix() below.
-void
-init_intra_matrixF(uint16_t* mpeg_quant_matrices, float quant)
+void init_intra_matrixF(uint16_t* mpeg_quant_matrices, float quant)
 {
   int i;
   uint16_t* intra_matrix = mpeg_quant_matrices + 0 * 64;
@@ -44,8 +43,7 @@ init_intra_matrixF(uint16_t* mpeg_quant_matrices, float quant)
 //
 //}
 
-void
-set_matrix(FrameInfo_args* FrameInfoArgs, uint8_t matrix_Num, uint8_t qtype, uint8_t quant, uint8_t range_expand)
+void set_matrix(FrameInfo_args* FrameInfoArgs, uint8_t matrix_Num, uint8_t qtype, uint8_t quant, uint8_t range_expand)
 {
   uint8_t   use_quant = quant;
   uint8_t   min_quant = quant;
@@ -219,8 +217,7 @@ set_matrix(FrameInfo_args* FrameInfoArgs, uint8_t matrix_Num, uint8_t qtype, uin
 
 
 
-void
-set_sharp_matrix(FrameInfo_args* FrameInfoArgs)
+void set_sharp_matrix(FrameInfo_args* FrameInfoArgs)
 {
 
   int   i, j;
@@ -296,8 +293,7 @@ set_sharp_matrix(FrameInfo_args* FrameInfoArgs)
 //   It probably makes more sense to clean up those boundaries with a second
 //   filter designed for that purpose.
 
-void
-init_matrix(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix, uint8_t matrix_Num, uint8_t qtype) {
+void init_matrix(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix, uint8_t matrix_Num, uint8_t qtype) {
 
   uint8_t const* use_matrix;
   uint8_t matrix[64];  // This matrix gets filled in with a copy of one of the following matrices.
@@ -483,8 +479,8 @@ init_matrix(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix, uint8_t 
   */
 
 
-  static const uint8_t matrix_1[64] = {      // even
-        5,  5,  5,  6,  7,  8,  9, 10,
+  static const uint8_t matrix_1[64] = {
+        5,  5,  5,  6,  7,  8,  9, 10,  // even
         5,  6,  6,  7,  8,  9, 10, 10,
         5,  6,  7,  8,  9, 10, 10, 10,
         6,  7,  8,  9, 10, 10, 10, 10,
@@ -539,8 +535,8 @@ init_matrix(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix, uint8_t 
 
 
 
-  static const uint8_t matrix_5[64] = {      // even add 3 to each value of case 20
-        6,  7,  8,  9, 10, 11, 12, 13,
+  static const uint8_t matrix_5[64] = {
+        6,  7,  8,  9, 10, 11, 12, 13,  // even add 3 to each value of case 20
         7,  9,  9, 10, 11, 12, 13, 13,
         8,  9, 10, 11, 12, 13, 13, 13,
         9, 10, 11, 12, 13, 13, 13, 13,
@@ -551,8 +547,8 @@ init_matrix(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix, uint8_t 
   };
 
 
-  static const uint8_t matrix_6[64] = {     // vert
-        6,  7,  8, 12, 12, 15, 15, 16,
+  static const uint8_t matrix_6[64] = {
+        6,  7,  8, 12, 12, 15, 15, 16,  // vert
         7,  9,  9, 10, 11, 12, 13, 13,
         8,  9, 10, 11, 12, 13, 13, 13,
         9, 10, 11, 12, 13, 13, 13, 13,
@@ -564,8 +560,8 @@ init_matrix(uint16_t* quant_intra_matrix, uint16_t* quant_inter_matrix, uint8_t 
 
 
 
-  static const uint8_t matrix_7[64] = {    // horiz
-        6,  7,  8,  9, 10, 11, 12, 13,
+  static const uint8_t matrix_7[64] = {
+        6,  7,  8,  9, 10, 11, 12, 13,  // horiz
         7,  9,  9, 10, 11, 12, 13, 13,
         8,  9, 10, 11, 12, 13, 13, 13,
        12, 10, 11, 12, 13, 13, 13, 13,

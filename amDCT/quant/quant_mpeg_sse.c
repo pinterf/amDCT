@@ -110,7 +110,7 @@ static uint32_t quant_mpeg_inter_notq1or2_ssse3(int16_t* coeff, const int16_t* d
   __m128i xmm_one = _mm_set1_epi16(1);
   __m128i sum = _mm_setzero_si128();
   //__m128i divider = _mm_loadl_epi64((__m128i*)(mmx_div + quant * 4 - 4)); // load the divider from mmx_div from old 64 bit asm
-  __m128i divider = _mm_set1_epi16((1 << 17) / (quant * 2) + 1); // Calculate divider dynamically
+  __m128i divider = _mm_set1_epi16((short)((1 << 17) / (quant * 2) + 1)); // Calculate divider dynamically
 
   for (int ecx = 0; ecx < 8; ecx++) {
     __m128i mm0 = _mm_load_si128((__m128i*)(data + 8 * ecx)); // 8 pixels at a time, a whole block
