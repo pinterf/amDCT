@@ -22,9 +22,6 @@
 #include "dct\fdct.h"
 #include "quant\quant_matrix.h"
 
-// temporarily we don't have external nasm compiled quant-dequant asm code
-#define USE_NEW_INTRINSICS_DCTLOOP
-
 void init_intra_matrixF(uint16_t* mpeg_quant_matrices, float quant);
 
 void quantDequant_sharp(int16_t* dct_block, const uint8_t* quant_sharp_preComp);
@@ -176,7 +173,11 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
 
         // NOTE: Most of the mmx/xmm/sse2 routines and C equivalents are from XVID.  Thank You XVID.
         //       I tested the available XVID routines for each section of the algorithm.
-        //     The ones that worked I ranked by speed and commented out all but the fastest one.
+        //       The ones that worked I ranked by speed and commented out all but the fastest one.
+        // NOTE2 by pinterf, the above mentioned multiple xvid-asm versions are no longer used.
+        // The original asm codes were rewritten in SIMD intrinsics, which are even quicker/much quicker
+        // than the originally used implementation. Anyway, these rewrites are giving bit identical results
+        // compared to the original asm versions.
 
 
           /*
@@ -304,10 +305,11 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
           break;
 
         case 2:
-#ifdef USE_NEW_INTRINSICS_DCTLOOP
-          // _c instead of asm FIXME: implement sse2 x64 friendly
-          quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
-          dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+#ifdef USE_NEW_INTRINSICS
+          quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+          //quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          //dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #else
           quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
           dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
@@ -318,6 +320,8 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
 #ifdef USE_NEW_INTRINSICS
           quant_mpeg_inter_ssse3(coeff_block, dct_block, quant, quant_inter_matrix);
           dequant_mpeg_inter_sse41(dct_block, coeff_block, quant, quant_inter_matrix);
+          //quant_mpeg_inter_c(coeff_block, dct_block, quant, quant_inter_matrix);
+          //dequant_mpeg_inter_c(dct_block, coeff_block, quant, quant_inter_matrix);
 #else
           quant_mpeg_inter_mmx(coeff_block, dct_block, quant, quant_inter_matrix);
           dequant_mpeg_inter_mmx(dct_block, coeff_block, quant, quant_inter_matrix);
@@ -325,10 +329,11 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
           break;
 
         case 4:
-#ifdef USE_NEW_INTRINSICS_DCTLOOP
-          // _c instead of asm FIXME: implement sse2 x64 friendly
-          quant_h263_inter_c(coeff_block, dct_block, quant, quant_intra_matrix);
-          dequant_h263_inter_c(dct_block, coeff_block, quant, quant_intra_matrix);
+#ifdef USE_NEW_INTRINSICS
+          quant_h263_inter_sse2(coeff_block, dct_block, quant, quant_intra_matrix);
+          dequant_h263_inter_sse2(dct_block, coeff_block, quant, quant_intra_matrix);
+          //quant_h263_inter_c(coeff_block, dct_block, quant, quant_intra_matrix);
+          //dequant_h263_inter_c(dct_block, coeff_block, quant, quant_intra_matrix);
 #else
           quant_h263_inter_mmx(coeff_block, dct_block, quant, quant_intra_matrix);
           dequant_h263_inter_mmx(dct_block, coeff_block, quant, quant_intra_matrix);
@@ -387,9 +392,12 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
 
 
         default:
-#ifdef USE_NEW_INTRINSICS_DCTLOOP
-          quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
-          dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+#ifdef USE_NEW_INTRINSICS
+          // like 2
+          quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+          //quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          //dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #else
           quant_h263_intra_mmx(coeff_block, dct_block, quant, 1, quant_intra_matrix);
           dequant_h263_intra_mmx(dct_block, coeff_block, quant, 1, quant_intra_matrix);
@@ -1018,90 +1026,3 @@ void transfer_8to16copy_c(int16_t* dst, uint8_t* src, uint32_t stride) {
     dst += 8; // Move to the next 8 words in dst
   }
 }
-
-
-//
-//
-//// src = uint16_t *dct_block[64]
-//// dst = uint16_t *acumulator[frameheight * framewidth]
-//// stride = frame_width
-//__forceinline void copy_add_16to16_xmm_test(int16_t *dst, int16_t * const src, int32_t stride) {
-//
-//  stride=stride<<1;
-//  
-//  __asm {
-//     ALIGN 16
-//
-//     mov     edx,   dst    // read for add
-//     mov     eax,   dst    // write back
-//     mov     esi,   src
-//     mov     ecx,   stride     
-//
-//      movupd    xmm0, [EDX]                     
-//      movdqa    xmm1, [ESI]                     
-//
-//      add       EDX,   ECX                                   
-//      movupd    xmm2, [EDX]  
-//      movdqa    xmm3, [ESI + 16]  
-//
-//      paddw     xmm0, xmm1                        
-//      movupd   [EAX], xmm0                      
-//
-//      add       EDX,   ECX                                   
-//      movupd    xmm4, [EDX]                     
-//      movdqa    xmm5, [ESI + 32]  
-//
-//      paddw     xmm2, xmm3                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm2                      
-//
-//      add       EDX,   ECX                                   
-//      movupd    xmm6, [EDX]                     
-//      movdqa    xmm7, [ESI + 48]  
-//
-//      paddw     xmm4, xmm5                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm4                      
-//                       
-//      add       EDX,   ECX                                   
-//      movupd    xmm0, [EDX]  
-//      movdqa    xmm1, [ESI + 64]  
-//
-//      paddw     xmm6, xmm7                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm6                      
-//                       
-//      add       EDX,   ECX                                   
-//      movupd    xmm2, [EDX]  
-//      movdqa    xmm3, [ESI + 80]  
-//
-//      paddw     xmm0, xmm1                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm0                      
-//
-//      add       EDX,   ECX                                   
-//      movupd    xmm4, [EDX]                     
-//      movdqa    xmm5, [ESI + 96]  
-//
-//      paddw     xmm2, xmm3                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm2                      
-//
-//      add       EDX,   ECX                                   
-//      movupd    xmm6, [EDX]                                                      
-//      movdqa    xmm7, [ESI + 112]  
-//
-//      paddw     xmm4, xmm5                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm4                      
-//
-//      paddw     xmm6, xmm7                        
-//      add       EAX,  ECX                                   
-//      movupd   [EAX], xmm6                      
-//                                                      
-//  }
-//  
-//  return;
-//}
-//
-//
