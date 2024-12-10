@@ -4087,7 +4087,7 @@ void dering_c(uint8_t* image, int height, int width, int quant) {
   }
 }
 
-
+#ifdef MMX_SSE_C_TESTS
 
 // tests, compare mmx, sse and c versions
 #include <stdio.h>
@@ -4315,3 +4315,4 @@ int compare_dering_all() {
   return 0;
 }
 
+#endif
