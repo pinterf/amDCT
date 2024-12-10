@@ -42,8 +42,6 @@
 //    "All code that you see at this blog is free to use, under MIT licence."
 //
 
-static   uint16_t MaxI = 0;
-
 void boxesForGauss(uint8_t* bxs, uint8_t sigma, uint8_t n);
 
 //void gaussBlur (uint8_t *scl, uint8_t *tcl, uint16_t width, uint16_t height, uint8_t radiusX, uint8_t radiusY, uint8_t strength, uint8_t T2) ;
