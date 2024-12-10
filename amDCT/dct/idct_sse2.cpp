@@ -286,42 +286,6 @@ static inline int test_row(const short* row) {
   return _mm_movemask_epi8(_mm_cmpeq_epi16(v, _mm_setzero_si128())) != 0xFFFF;
 }
 
-// Helper function for matrix multiplication
-static inline void iMTX_MULT2(int idx, uint16_t* data, const uint16_t* table, const uint32_t* rounder, int shift) {
-  __m128i xmm0 = _mm_load_si128((__m128i*) & data[idx * 8]);
-
-  // Shuffle pattern: 11011000b for both low and high
-  xmm0 = _mm_shufflelo_epi16(xmm0, 0xD8);
-  xmm0 = _mm_shufflehi_epi16(xmm0, 0xD8);
-
-  __m128i xmm4 = _mm_shuffle_epi32(xmm0, 0x00);
-  __m128i xmm5 = _mm_shuffle_epi32(xmm0, 0xAA);
-  __m128i xmm6 = _mm_shuffle_epi32(xmm0, 0x55);
-  __m128i xmm7 = _mm_shuffle_epi32(xmm0, 0xFF);
-
-  xmm4 = _mm_madd_epi16(xmm4, _mm_load_si128((__m128i*)(table + 0)));
-  xmm5 = _mm_madd_epi16(xmm5, _mm_load_si128((__m128i*)(table + 8)));
-  xmm6 = _mm_madd_epi16(xmm6, _mm_load_si128((__m128i*)(table + 16)));
-  xmm7 = _mm_madd_epi16(xmm7, _mm_load_si128((__m128i*)(table + 24)));
-
-  xmm4 = _mm_add_epi32(xmm4, _mm_load_si128((__m128i*)rounder));
-
-  xmm6 = _mm_add_epi32(xmm6, xmm7);
-  xmm4 = _mm_add_epi32(xmm4, xmm5);
-
-  xmm7 = xmm6;
-  xmm6 = _mm_add_epi32(xmm6, xmm4);
-  xmm4 = _mm_sub_epi32(xmm4, xmm7);
-
-  xmm6 = _mm_srai_epi32(xmm6, shift);
-  xmm4 = _mm_srai_epi32(xmm4, shift);
-
-  xmm6 = _mm_packs_epi32(xmm6, xmm4);
-  xmm6 = _mm_shufflehi_epi16(xmm6, 0x1B);
-
-  _mm_store_si128((__m128i*) & data[idx * 8], xmm6);
-}
-
 /*
 ; ---------------------------------------------------------------------------- -
 ; Function idct(this one skips null rows)
