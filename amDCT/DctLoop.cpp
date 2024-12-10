@@ -35,10 +35,10 @@ void quantDequant_expandRange(int16_t* dct_block,
 #define SCALEBITS 17
 
 #ifndef ARCH_IS_X86_64
-_Alignas(16) uint16_t  allFF[8] = { 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff };
-_Alignas(16) uint16_t  negBit[8] = { 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000 };
-_Alignas(16) uint16_t  low15bits[8] = { 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff };
-_Alignas(16) uint16_t  lowB[8] = { 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff };
+alignas(16) uint16_t  allFF[8] = { 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff };
+alignas(16) uint16_t  negBit[8] = { 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000 };
+alignas(16) uint16_t  low15bits[8] = { 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff };
+alignas(16) uint16_t  lowB[8] = { 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff };
 #endif
 
 
@@ -77,11 +77,11 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
   //int16_t cnn1, cnn2, cnn3, cnn4, cnn11, cnn21, cnn31, cnn41; 
   //int16_t cd1, cd2, cd3, cd4; // 1 in toward center from corner vals of block
 
-  _Alignas(16) int16_t    dct_block[64];
-  _Alignas(16) int16_t    coeff_block[64];
-  _Alignas(16) int16_t    dct_blockTemp[64];  // Used for displaying the DCT values.
+  alignas(16) int16_t    dct_block[64];
+  alignas(16) int16_t    coeff_block[64];
+  alignas(16) int16_t    dct_blockTemp[64];  // Used for displaying the DCT values.
 
-  _Alignas(16) int16_t    dct_blockOrig[MATRIX_SIZE];
+  alignas(16) int16_t    dct_blockOrig[MATRIX_SIZE];
 
 
 

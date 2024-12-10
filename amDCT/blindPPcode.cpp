@@ -2,7 +2,8 @@
 #include  <math.h>
 #include <emmintrin.h> // Header for SSE2 intrinsics
 #include <tmmintrin.h> // Header for SSSE3 intrinsics
-#include <smmintrin.h> // SSE4.2
+#include <smmintrin.h> // SSE4.1
+#include <nmmintrin.h> // SSE4.2 header
 
 #include "blindPPcode.h"
 #include "amDCTPortab.h"  // needed for uint32_t etc.  

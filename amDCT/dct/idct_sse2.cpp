@@ -2,6 +2,7 @@
 // which contained both fdct and idct implementations
 
 #include <stdint.h>
+#include <intrin.h>
 #include <emmintrin.h>
 #include "fdct.h"
 
@@ -58,44 +59,44 @@
 ;-----------------------------------------------------------------------------
 */
 
-_Alignas(16) static const int16_t tan1[] = { 0x32ec,0x32ec,0x32ec,0x32ec,0x32ec,0x32ec,0x32ec,0x32ec }; // tan(pi / 16)
-_Alignas(16) static const int16_t tan2[] = { 0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a }; // tan(2pi / 16)  (= sqrt(2) - 1)
-_Alignas(16) static const int16_t tan3[] = { 0xab0e,0xab0e,0xab0e,0xab0e,0xab0e,0xab0e,0xab0e,0xab0e }; // tan(3pi / 16) - 1
-_Alignas(16) static const int16_t sqrt2[] = { 0x5a82,0x5a82,0x5a82,0x5a82,0x5a82,0x5a82,0x5a82,0x5a82 }; // 0.5 / sqrt(2)
+alignas(16) static const uint16_t tan1[] = { 0x32ec,0x32ec,0x32ec,0x32ec,0x32ec,0x32ec,0x32ec,0x32ec }; // tan(pi / 16)
+alignas(16) static const uint16_t tan2[] = { 0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a,0x6a0a }; // tan(2pi / 16)  (= sqrt(2) - 1)
+alignas(16) static const uint16_t tan3[] = { 0xab0e,0xab0e,0xab0e,0xab0e,0xab0e,0xab0e,0xab0e,0xab0e }; // tan(3pi / 16) - 1
+alignas(16) static const uint16_t sqrt2[] = { 0x5a82,0x5a82,0x5a82,0x5a82,0x5a82,0x5a82,0x5a82,0x5a82 }; // 0.5 / sqrt(2)
 
 //; ---------------------------------------------------------------------------- -
 //; Inverse DCT tables
 //; ---------------------------------------------------------------------------- -
 
-_Alignas(16) static const int16_t iTab1[] = {
+alignas(16) static const uint16_t iTab1[] = {
     0x4000, 0x539f, 0x4000, 0x22a3, 0x4000, 0xdd5d, 0x4000, 0xac61,
     0x4000, 0x22a3, 0xc000, 0xac61, 0xc000, 0x539f, 0x4000, 0xdd5d,
     0x58c5, 0x4b42, 0x4b42, 0xee58, 0x3249, 0xa73b, 0x11a8, 0xcdb7,
     0x3249, 0x11a8, 0xa73b, 0xcdb7, 0x11a8, 0x4b42, 0x4b42, 0xa73b
 };
 
-_Alignas(16) static const int16_t iTab2[] = {
+alignas(16) static const uint16_t iTab2[] = {
     0x58c5, 0x73fc, 0x58c5, 0x300b, 0x58c5, 0xcff5, 0x58c5, 0x8c04,
     0x58c5, 0x300b, 0xa73b, 0x8c04, 0xa73b, 0x73fc, 0x58c5, 0xcff5,
     0x7b21, 0x6862, 0x6862, 0xe782, 0x45bf, 0x84df, 0x187e, 0xba41,
     0x45bf, 0x187e, 0x84df, 0xba41, 0x187e, 0x6862, 0x6862, 0x84df
 };
 
-_Alignas(16) static const int16_t iTab3[] = {
+alignas(16) static const uint16_t iTab3[] = {
     0x539f, 0x6d41, 0x539f, 0x2d41, 0x539f, 0xd2bf, 0x539f, 0x92bf,
     0x539f, 0x2d41, 0xac61, 0x92bf, 0xac61, 0x6d41, 0x539f, 0xd2bf,
     0x73fc, 0x6254, 0x6254, 0xe8ee, 0x41b3, 0x8c04, 0x1712, 0xbe4d,
     0x41b3, 0x1712, 0x8c04, 0xbe4d, 0x1712, 0x6254, 0x6254, 0x8c04
 };
 
-_Alignas(16) static const int16_t iTab4[] = {
+alignas(16) static const uint16_t iTab4[] = {
     0x4b42, 0x6254, 0x4b42, 0x28ba, 0x4b42, 0xd746, 0x4b42, 0x9dac,
     0x4b42, 0x28ba, 0xb4be, 0x9dac, 0xb4be, 0x6254, 0x4b42, 0xd746,
     0x6862, 0x587e, 0x587e, 0xeb3d, 0x3b21, 0x979e, 0x14c3, 0xc4df,
     0x3b21, 0x14c3, 0x979e, 0xc4df, 0x14c3, 0x587e, 0x587e, 0x979e
 };
 
-_Alignas(16) static const uint32_t Walken_Idct_Rounders[] = {
+alignas(16) static const uint32_t Walken_Idct_Rounders[] = {
     65536, 65536, 65536, 65536,
     3597,  3597,  3597,  3597,
     2260,  2260,  2260,  2260,
@@ -106,7 +107,7 @@ _Alignas(16) static const uint32_t Walken_Idct_Rounders[] = {
     512,   512,   512,   512
 };
 
-_Alignas(16) const uint16_t Walken_Idct_Rounders_dw[] = {
+alignas(16) const uint16_t Walken_Idct_Rounders_dw[] = {
     65536 >> 11, 65536 >> 11, 65536 >> 11, 65536 >> 11, 65536 >> 11, 65536 >> 11, 65536 >> 11, 65536 >> 11,
     3597 >> 11,  3597 >> 11,  3597 >> 11,  3597 >> 11,  3597 >> 11,  3597 >> 11,  3597 >> 11,  3597 >> 11,
     2260 >> 11,  2260 >> 11,  2260 >> 11,  2260 >> 11,  2260 >> 11,  2260 >> 11,  2260 >> 11,  2260 >> 11,
@@ -118,7 +119,7 @@ _Alignas(16) const uint16_t Walken_Idct_Rounders_dw[] = {
 ; Helper macro iMTX_MULT
 ; ---------------------------------------------------------------------------- -
 */
-static inline void iMTX_MULT(int row_idx, int16_t* src_dst, const int16_t* table, const uint32_t* rounder, int shift) {
+static inline void iMTX_MULT(int row_idx, int16_t* src_dst, const uint16_t* table, const uint32_t* rounder, int shift) {
   // Load source data and perform initial shuffling
   __m128i xmm0 = _mm_load_si128((__m128i*)(src_dst + row_idx * 8));
 
@@ -286,7 +287,7 @@ static inline int test_row(const short* row) {
 }
 
 // Helper function for matrix multiplication
-static inline void iMTX_MULT2(int idx, uint16_t* data, const int16_t* table, const uint32_t* rounder, int shift) {
+static inline void iMTX_MULT2(int idx, uint16_t* data, const uint16_t* table, const uint32_t* rounder, int shift) {
   __m128i xmm0 = _mm_load_si128((__m128i*) & data[idx * 8]);
 
   // Shuffle pattern: 11011000b for both low and high

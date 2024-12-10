@@ -1,3 +1,4 @@
+#include "avs/config.h"
 #include "Memory.h"
 #include "amDCT.h"      // needed for BLKSIZE
 #include "amDCTtypedefs.h"
@@ -612,7 +613,7 @@ int  malloc_MultiThread(Memory_args* args, int numBlocksWork, int sizeBlocksWork
   //  blkAdaptSmoothAmt
   fail = -1;
   for (i = 0; i < ncpu; i++) {
-    tempPtr = _aligned_malloc(numBlocksWork * 4, ALIGN_16);
+    tempPtr = (uint8_t *)_aligned_malloc(numBlocksWork * 4, ALIGN_16);
     if (tempPtr == 0) {
       fail = i;
       break;
@@ -638,7 +639,7 @@ int  malloc_MultiThread(Memory_args* args, int numBlocksWork, int sizeBlocksWork
   //  blkAdaptExpandAmt
   fail = -1;
   for (i = 0; i < ncpu; i++) {
-    tempPtr = _aligned_malloc(numBlocksWork * 4, ALIGN_16);
+    tempPtr = (uint8_t *)_aligned_malloc(numBlocksWork * 4, ALIGN_16);
     if (tempPtr == 0) {
       fail = i;
       break;
@@ -666,7 +667,7 @@ int  malloc_MultiThread(Memory_args* args, int numBlocksWork, int sizeBlocksWork
   //  blkAdaptSharpAmt
   fail = -1;
   for (i = 0; i < ncpu; i++) {
-    tempPtr = _aligned_malloc(numBlocksWork * 4, ALIGN_16);
+    tempPtr = (uint8_t*)_aligned_malloc(numBlocksWork * 4, ALIGN_16);
     if (tempPtr == 0) {
       fail = i;
       break;

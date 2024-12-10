@@ -190,7 +190,7 @@ void  LumaBlockInfo(FrameInfo_args* FrameInfoArgs) {
   //  // FUTURE ENHANCEMENT!  ANALYSE DCT VALUES FOR EACH BLOCK TO DETERMINE SPECIFIC CHANGES IN THE BLOCK
   //  // NOTE START OF CODE IS IN ROUTINE AT BOTTOM OF THE FILE!!!
   //  // Get the dct of the block and see if it is useful
-  //  _Alignas(16) int16_t    dct_block[64];
+  //  alignas(16) int16_t    dct_block[64];
   //
   //  // use pvalArr
   //  transfer_8to16copy(dct_block, BF_workP, rowStride);
@@ -602,8 +602,8 @@ void  Get_DCTFrame(FrameInfo_args *FrameInfoArgs) {
 //  uint16_t  blkRow,  blkCol;
 //  int     stride = numBlocks_wide<<3;
 
-  _Alignas(16) int16_t   dct_block[MATRIX_SIZE];
-//  _Alignas(16) uint8_t   newMatrix[MATRIX_SIZE];
+  alignas(16) int16_t   dct_block[MATRIX_SIZE];
+//  alignas(16) uint8_t   newMatrix[MATRIX_SIZE];
 
 
 
@@ -862,7 +862,7 @@ static const int16_t iMask_Coeff[64] = {
 uint32_t get_coeff8_energy_c(FrameInfo_args* FrameInfoArgs, uint8_t* src, int startPix) {
   int     stride = FrameInfoArgs->numBlocks_wide << 3;
 
-  _Alignas(16) int16_t dct_block[64];
+  alignas(16) int16_t dct_block[64];
 
   src = src + startPix;
   transfer_8to16copy1_c(dct_block, src, stride);

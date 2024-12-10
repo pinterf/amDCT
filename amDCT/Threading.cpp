@@ -31,7 +31,7 @@ void setShift(uint8_t        starti,
 // It then collects and combines the returned information from each thread.
 
 int dct_loop_wrapper(void* arg) {
-  DctLoopThread(arg);
+  DctLoopThread((DctLoop_args *)arg);
   return 0;
 }
 

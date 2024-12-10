@@ -57,8 +57,8 @@ void buildPerBlockMatrix(FrameInfo_args* FrameInfoArgs) {
   uint16_t  blkRow, blkCol;
   int     stride = numBlocks_wide << 3;
 
-  _Alignas(16) int16_t   dct_block[MATRIX_SIZE];
-  _Alignas(16) uint8_t   newMatrix[MATRIX_SIZE];
+  alignas(16) int16_t   dct_block[MATRIX_SIZE];
+  alignas(16) uint8_t   newMatrix[MATRIX_SIZE];
 
   // NOTE: Currently this just does the DCT and skips the quant-dequant as well as the IDCT
   //       A second mask could allow the quant-dequant processing, skip the IDCT processing and then return.
