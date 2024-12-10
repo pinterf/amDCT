@@ -16,6 +16,7 @@
  *
  ****************************************************************************/
 
+#include "../avs/config.h"
 #include "quant.h"
 #include "quant_matrix.h"
 
@@ -31,6 +32,9 @@
 
 // let's be safe, using 32 bit intermediates, though the original asm is using 16 bit
 // based on C version
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("sse4.1")))
+#endif
 uint32_t dequant_mpeg_inter_sse41(int16_t* data,
   const int16_t* coeff,
   const uint32_t quant,
@@ -106,6 +110,9 @@ uint32_t dequant_mpeg_inter_sse41(int16_t* data,
 // Logic based on quant_mpeg_inter_mmx version from quantize_mpeg_mmx.asm
 // Original quant_mpeg_inter special cases for quant=1 or quant=2 are implemented in distinct functions.
 
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("ssse3")))
+#endif
 static uint32_t quant_mpeg_inter_notq1or2_ssse3(int16_t* coeff, const int16_t* data, const uint32_t quant, const uint16_t* mpeg_matrices) {
   __m128i xmm_one = _mm_set1_epi16(1);
   __m128i sum = _mm_setzero_si128();
@@ -146,6 +153,9 @@ static uint32_t quant_mpeg_inter_notq1or2_ssse3(int16_t* coeff, const int16_t* d
 }
 
 
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("ssse3")))
+#endif
 static uint32_t quant_mpeg_inter_q1_ssse3(int16_t* coeff, const int16_t* data, const uint32_t quant, const uint16_t* mpeg_matrices) {
   // quant is not used intentionally, here fixed 1
   __m128i xmm_one = _mm_set1_epi16(1);
@@ -183,6 +193,9 @@ static uint32_t quant_mpeg_inter_q1_ssse3(int16_t* coeff, const int16_t* data, c
   return _mm_cvtsi128_si32(sum); // Return the lower 32 bits
 }
 
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("ssse3")))
+#endif
 static uint32_t quant_mpeg_inter_q2_ssse3(int16_t* coeff, const int16_t* data, const uint32_t quant, const uint16_t* mpeg_matrices) {
   // quant is not used intentionally, here fixed 2
   __m128i xmm_one = _mm_set1_epi16(1);

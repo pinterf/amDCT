@@ -16,9 +16,11 @@
  *
  ****************************************************************************/
 
+#include "../avs/config.h"
 #include <stdint.h>
 
 #include <emmintrin.h>
+#include <tmmintrin.h> // SSSE3
 #include <immintrin.h>
 
 #include "quant.h"
@@ -72,6 +74,9 @@ uint32_t quant_h263_intra_sse2(int16_t* coeff, const int16_t* const data,
   return 0;
 }
 
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("ssse3")))
+#endif
 uint32_t quant_h263_inter_sse2(int16_t* coeff, const int16_t* data, uint32_t quant, const uint16_t* mpeg_matrices) {
   __m128i sum = _mm_setzero_si128();
   __m128i sub = _mm_set1_epi16((short)(quant / 2));

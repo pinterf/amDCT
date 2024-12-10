@@ -1,3 +1,4 @@
+#include "avs/config.h"
 #include  <math.h>
 #include <emmintrin.h> // Header for SSE2 intrinsics
 #include <tmmintrin.h> // Header for SSSE3 intrinsics
@@ -840,6 +841,9 @@ void deblock_horiz_lpf9_c(uint8_t* v, int stride, int QP) {
 /* The 9-tap low pass filter used in "DC" regions */
 // intrinsic rewrite by pinterf
 // FIXME: not very optimal do it like in C and in deblock_vert_lpf9
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("ssse3")))
+#endif
 void deblock_horiz_lpf9_ssse3(uint8_t* v, int stride, int QP) {
   for (int y = 0; y < 4; y++) {
     // Calculate p1 and p2 based on QP threshold
@@ -914,6 +918,9 @@ int deblock_horiz_useDC_c(uint8_t* v, int stride, int moderate_h)
 
 #ifdef USE_NEW_INTRINSICS
 // written based on C (sse4.2)
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("sse4.2")))
+#endif
 int deblock_horiz_useDC(uint8_t* v, int stride, int moderate_h) {
   int useDC;
   int eq_cnt2 = 0;
@@ -2847,6 +2854,9 @@ void deblock_vert_lpf9_ssse3_b(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, in
 
 // based on deblock_horiz_lpf9_c
 // doing only smart add and subtracts from a previous temporary result
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("ssse3")))
+#endif
 void deblock_vert_lpf9_ssse3(uint64_t* v_local, uint64_t* p1p2, uint8_t* v, int stride) {
   __m128i* vv_ptr = (__m128i*)v_local;
   __m128i* p1p2_ptr = (__m128i*)p1p2;
@@ -3861,7 +3871,7 @@ void dering_mmx(uint8_t* image, int height, int width, int quant) {
 
 void dering(uint8_t* image, int height, int width, int quant) {
 #ifdef USE_NEW_INTRINSICS
-  dering_sse42(image, height, width, quant);
+  dering_sse41(image, height, width, quant);
 #else
   dering_mmx(image, height, width, quant);
 #endif
@@ -3872,7 +3882,10 @@ void dering(uint8_t* image, int height, int width, int quant) {
 // new MMXSSE version - trbarry 3/15/2002
 // modified calling sequence for smoothD2() - Jim Conklin 1-20-2013
 // converted to intrinsics sse4.2 by pinterf
-void dering_sse42(uint8_t* image, int height, int width, int quant) {
+#if defined(GCC) || defined(CLANG)
+__attribute__((__target__("sse4.1")))
+#endif
+void dering_sse41(uint8_t* image, int height, int width, int quant) {
   int stride = width;
   uint8_t* b8x8, * b10x10;
   uint8_t b8x8filtered[64];
@@ -4277,8 +4290,8 @@ int compare_dering_all() {
 #ifndef ARCH_IS_X86_64
   dering_mmx(&mmx_result[safe_topleft_index], HEIGHT, WIDTH, QP);      // Original MMX version
 #endif
-  dering_sse42(&sse_result[safe_topleft_index], HEIGHT, WIDTH, QP);      // new SSE4.2
-  dering_c(&c_result[safe_topleft_index], HEIGHT, WIDTH, QP);      // new SSE4.2
+  dering_sse41(&sse_result[safe_topleft_index], HEIGHT, WIDTH, QP);
+  dering_c(&c_result[safe_topleft_index], HEIGHT, WIDTH, QP);
 
   // Print results
   //print_array("MMX result", mmx_result, HEIGHT, WIDTH);

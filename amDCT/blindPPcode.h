@@ -30,7 +30,7 @@ void dering(uint8_t* image, int height, int width, int quant);
 #ifndef ARCH_IS_X86_64
 void dering_mmx(uint8_t* image, int height, int width, int quant);
 #endif
-void dering_sse42(uint8_t* image, int height, int width, int quant);
+void dering_sse41(uint8_t* image, int height, int width, int quant);
 void dering_c(uint8_t* image, int height, int width, int quant);
 
 #endif // _BLINDPPCODE_H_
