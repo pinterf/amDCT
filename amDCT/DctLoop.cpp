@@ -1,4 +1,4 @@
-
+#include "avs/config.h"
 #include <math.h>
 
 #include <stdint.h>
@@ -583,7 +583,7 @@ void quantDequant_expandRange(
 }
 
 
-__forceinline void copy_add_16to16_clpsrc(uint16_t* dst, int16_t* const src, int32_t stride) {
+AVS_FORCEINLINE void copy_add_16to16_clpsrc(uint16_t* dst, int16_t* const src, int32_t stride) {
 #ifdef INTEL_INTRINSICS
   copy_add_16to16_clpsrc_sse2(dst, src, stride);
 #else
@@ -592,7 +592,7 @@ __forceinline void copy_add_16to16_clpsrc(uint16_t* dst, int16_t* const src, int
 }
 
 #ifdef INTEL_INTRINSICS
-__forceinline void copy_add_16to16_clpsrc_sse2(uint16_t* dst, int16_t* const src, int32_t stride) {
+AVS_FORCEINLINE void copy_add_16to16_clpsrc_sse2(uint16_t* dst, int16_t* const src, int32_t stride) {
 
   __m128i zero = _mm_setzero_si128();
   __m128i max_val = _mm_set1_epi16(255);
@@ -656,7 +656,7 @@ void quantDequant_shift14_c(int16_t* dct_block, const uint16_t* qtype1_matrix, c
   }
 }
 
-__forceinline void quantDequant(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
+AVS_FORCEINLINE void quantDequant(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
 #ifdef INTEL_INTRINSICS
   quantDequant_sse2(dct_block, qtype1_matrix, qtype1_matrix_quant);
 #else
@@ -665,7 +665,7 @@ __forceinline void quantDequant(int16_t* dct_block, const uint16_t* qtype1_matri
 }
 
 #ifdef INTEL_INTRINSICS
-__forceinline void quantDequant_sse2(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
+AVS_FORCEINLINE void quantDequant_sse2(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
   __m128i low15bits_vec = _mm_set1_epi16(0x7FFF); // Mask for low 15 bits
   __m128i allFF_vec = _mm_set1_epi16(0xFFFF); // Mask for all bits set
   __m128i negBit_vec = _mm_set1_epi16(0x8000); // Mask for the sign bit
@@ -708,7 +708,8 @@ __forceinline void quantDequant_sse2(int16_t* dct_block, const uint16_t* qtype1_
   }
 }
 #endif
-__forceinline void transfer_8to16copy(int16_t* dst, uint8_t* src, uint32_t stride) {
+
+AVS_FORCEINLINE void transfer_8to16copy(int16_t* dst, uint8_t* src, uint32_t stride) {
 #ifdef INTEL_INTRINSICS
   transfer_8to16copy_sse2(dst, src, stride);
 #else
@@ -717,7 +718,7 @@ __forceinline void transfer_8to16copy(int16_t* dst, uint8_t* src, uint32_t strid
 }
 
 #ifdef INTEL_INTRINSICS
-__forceinline void transfer_8to16copy_sse2(int16_t* dst, uint8_t* src, uint32_t stride) {
+AVS_FORCEINLINE void transfer_8to16copy_sse2(int16_t* dst, uint8_t* src, uint32_t stride) {
   __m128i xmm0 = _mm_setzero_si128(); // Set xmm0 to zero
 
   for (int i = 0; i < 8; ++i) {
