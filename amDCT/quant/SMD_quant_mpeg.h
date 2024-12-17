@@ -3,7 +3,7 @@
 #ifndef _SMD_QUANT_MPEG_H_
 #define _SMD_QUANT_MPEG_H_
 
-#include "..\amDCTPortab.h"  // needed for uint32_t etc.  
+#include "../amDCTPortab.h"  // needed for uint32_t etc.  
 
 
 

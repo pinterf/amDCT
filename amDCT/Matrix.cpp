@@ -3,7 +3,7 @@
 #include "amDCTtypedefs.h"
 
 #include "Matrix.h"
-#include "quant\quant_matrix.h"
+#include "quant/quant_matrix.h"
 #include "Utilities.h"
 
 #define SCALEBITS 17

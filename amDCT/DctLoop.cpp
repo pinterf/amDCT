@@ -17,10 +17,10 @@
 
 #include "Matrix.h"
 
-#include "quant\quant.h"
-#include "dct\idct.h"
-#include "dct\fdct.h"
-#include "quant\quant_matrix.h"
+#include "quant/quant.h"
+#include "dct/idct.h"
+#include "dct/fdct.h"
+#include "quant/quant_matrix.h"
 
 void init_intra_matrixF(uint16_t* mpeg_quant_matrices, float quant);
 

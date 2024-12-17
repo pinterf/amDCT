@@ -13,7 +13,7 @@
 #include "Threading.h"
 #include "DctLoop.h"
 #include "avgDctLoop.h"
-#include "dct\fdct.h"
+#include "dct/fdct.h"
 
 void     transfer_8to16copy1_c(int16_t* const dst, uint8_t* src, uint32_t stride);
 void   test_transfer_16to8copy_c(uint8_t* dst, int16_t* src, uint32_t stride);

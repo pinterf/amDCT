@@ -2,7 +2,7 @@
 #include "Memory.h"
 
 #include "Matrix.h"
-#include "quant\quant_matrix.h"
+#include "quant/quant_matrix.h"
 
 #include "DispatchLoop.h"
 #include "LumaBlockInfo.h"
