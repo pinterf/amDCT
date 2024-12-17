@@ -7,9 +7,9 @@
 #include "avgDctLoop.h"
 #include "Utilities.h"
 #include "BuildPreCompVals.h"
+#ifdef INTEL_INTRINSICS
 #include "emmintrin.h"
-
-//__inline void avgAccum_xmm(uint8_t *dst, int16_t * const src, int32_t len, uint8_t round, uint8_t numShiftsHiBit);  BROKEN
+#endif
 
 __inline uint8_t   doBrightSmoothed(uint8_t* BrightProtectDifArr, uint8_t src, uint8_t smooth, uint8_t start);
 __inline uint8_t   doDarkProtect(uint8_t* DarkProtectDifArr, uint8_t src, uint8_t smooth, uint8_t darkStart);
@@ -619,9 +619,6 @@ uint8_t  avgDctLoopAccumSmoothed(FrameInfo_args* FrameInfoArgs) {
   buildBrightProtectDifVals(BrightProtectDifArr, brightStart, brightAmt, maxSrc, expand);
   FrameInfoArgs->buildBrightProtectDifValsDone = 1;
 
-#ifdef ARCH_IS_IA32
-  _mm_empty();
-#endif
   return(0);
 }
 
@@ -660,9 +657,6 @@ uint8_t  avgDctLoopAccumSharp(FrameInfo_args* FrameInfoArgs) {
     }
   }
 
-#ifdef ARCH_IS_IA32
-  _mm_empty();
-#endif
   return(0);
 }
 
@@ -870,9 +864,6 @@ uint8_t  avgDctLoopAccumDCT(FrameInfo_args* FrameInfoArgs) {
     BF_accumP += src_width;
   }
 
-#ifdef ARCH_IS_IA32
-  _mm_empty();
-#endif
   return(0);
 }
 //*/

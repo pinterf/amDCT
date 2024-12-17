@@ -18,6 +18,10 @@ void  copySrcToDst2(uint8_t* src, uint8_t* dst, uint32_t src_width, uint32_t dst
 int   showBlockDetail(FrameInfo_args* FrameInfoArgs, uint8_t showMask);
 
 void  UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight);
+#ifdef INTEL_INTRINSICS
+void  UnDot_sse2(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight);
+#endif
+void  UnDot_c(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight);
 
 void  DrawYV12(uint8_t* dst, unsigned int dst_height, unsigned int dst_width, int x1, int y1, const char* s);
 void  Draw16x16Block(uint8_t* dst, unsigned int dst_height, unsigned int dst_width, int x1, int y1, const char val);

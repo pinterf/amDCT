@@ -37,7 +37,7 @@ extern idctFuncPtr idct;
 idctFunc idct_int32; // better use this one if 
 idctFunc simple_idct_c; // Michael Niedermayer
 
-#if defined(ARCH_IS_IA32) || defined(ARCH_IS_X86_64)
+#ifdef INTEL_INTRINSICS
 idctFunc idct_sse2; // converted from skal version, IEEE 1180 compliant */
 #endif
 

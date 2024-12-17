@@ -34,15 +34,6 @@ void quantDequant_expandRange(int16_t* dct_block,
 
 #define SCALEBITS 17
 
-#ifndef ARCH_IS_X86_64
-alignas(16) uint16_t  allFF[8] = { 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff };
-alignas(16) uint16_t  negBit[8] = { 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x8000 };
-alignas(16) uint16_t  low15bits[8] = { 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff, 0x7fff };
-alignas(16) uint16_t  lowB[8] = { 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff, 0x00ff };
-#endif
-
-
-
 // There are 3 buffers that the primary smoothing algorithm uses.
 // 1: The uint8_t source buffer BF_src.  The values in this are never changed.
 //    The source buffer is copied into the shifted position of the work buffer.
@@ -192,8 +183,11 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
               /*
                *  2: DO DCT ON THE BLOCK.
                */
-      //fdct_int32(dct_block);       // C version for testing.
+#ifdef INTEL_INTRINSICS
       fdct_sse2(dct_block);       // based on fdct_sse2_skal
+#else
+      fdct_int32(dct_block);       // C version for testing.
+#endif
 
       if (showMask == 18 || showMask == 19) {
         memcpy(dct_blockOrig, dct_block, blockSize);
@@ -305,38 +299,32 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
           break;
 
         case 2:
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
           quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
           dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
-          //quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
-          //dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #else
-          quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
-          dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+          quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #endif
           break;
 
         case 3:
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
           quant_mpeg_inter_ssse3(coeff_block, dct_block, quant, quant_inter_matrix);
           dequant_mpeg_inter_sse41(dct_block, coeff_block, quant, quant_inter_matrix);
-          //quant_mpeg_inter_c(coeff_block, dct_block, quant, quant_inter_matrix);
-          //dequant_mpeg_inter_c(dct_block, coeff_block, quant, quant_inter_matrix);
 #else
-          quant_mpeg_inter_mmx(coeff_block, dct_block, quant, quant_inter_matrix);
-          dequant_mpeg_inter_mmx(dct_block, coeff_block, quant, quant_inter_matrix);
+          quant_mpeg_inter_c(coeff_block, dct_block, quant, quant_inter_matrix);
+          dequant_mpeg_inter_c(dct_block, coeff_block, quant, quant_inter_matrix);
 #endif
           break;
 
         case 4:
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
           quant_h263_inter_sse2(coeff_block, dct_block, quant, quant_intra_matrix);
           dequant_h263_inter_sse2(dct_block, coeff_block, quant, quant_intra_matrix);
-          //quant_h263_inter_c(coeff_block, dct_block, quant, quant_intra_matrix);
-          //dequant_h263_inter_c(dct_block, coeff_block, quant, quant_intra_matrix);
 #else
-          quant_h263_inter_mmx(coeff_block, dct_block, quant, quant_intra_matrix);
-          dequant_h263_inter_mmx(dct_block, coeff_block, quant, quant_intra_matrix);
+          quant_h263_inter_c(coeff_block, dct_block, quant, quant_intra_matrix);
+          dequant_h263_inter_c(dct_block, coeff_block, quant, quant_intra_matrix);
 #endif
           break;
 
@@ -392,15 +380,13 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
 
 
         default:
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
           // like 2
           quant_h263_intra_sse2(coeff_block, dct_block, quant, 1, quant_intra_matrix);
           dequant_h263_intra_sse2(dct_block, coeff_block, quant, 1, quant_intra_matrix);
-          //quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
-          //dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #else
-          quant_h263_intra_mmx(coeff_block, dct_block, quant, 1, quant_intra_matrix);
-          dequant_h263_intra_mmx(dct_block, coeff_block, quant, 1, quant_intra_matrix);
+          quant_h263_intra_c(coeff_block, dct_block, quant, 1, quant_intra_matrix);
+          dequant_h263_intra_c(dct_block, coeff_block, quant, 1, quant_intra_matrix);
 #endif
           break;
 
@@ -419,9 +405,12 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
       /*
        *  4: DO iDCT ON THE BLOCK
        */
-      //idct_int32(dct_block);      // C version for testing.
-      //simple_idct_c(dct_block);   // C version for testing. (more precise)
+#ifdef INTEL_INTRINSICS
       idct_sse2(dct_block);    // based on idct_sse2_skal
+#else
+       //idct_int32(dct_block);      // C version for testing.
+       simple_idct_c(dct_block);   // C version for testing. (more precise)
+#endif
 
 
 
@@ -463,10 +452,6 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
       }
 
 
-#ifdef ARCH_IS_IA32
-      _mm_empty();
-#endif
-
               /*
                *     5: ADD BLOCK VALUES TO THOSE IN BF_workP
                * Note that the values in dct_block are not in 0-255 range.
@@ -485,10 +470,6 @@ void DctLoop(int starti, int startj, DctLoop_args* args) {
     BF_tmp_16P += blkStride - rowStride; // - rowStride since we already did a rowStride in the blkColSt loop.    
   } // end for blkRowSt
 
-
-#ifdef ARCH_IS_IA32
-  _mm_empty();
-#endif
   return;
 }
 
@@ -603,13 +584,14 @@ void quantDequant_expandRange(
 
 
 __forceinline void copy_add_16to16_clpsrc(uint16_t* dst, int16_t* const src, int32_t stride) {
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
   copy_add_16to16_clpsrc_sse2(dst, src, stride);
 #else
-  copy_add_16to16_clpsrc_xmm(dst, src, stride);
+  copy_add_16to16_clpsrc_c(dst, src, stride);
 #endif
 }
 
+#ifdef INTEL_INTRINSICS
 __forceinline void copy_add_16to16_clpsrc_sse2(uint16_t* dst, int16_t* const src, int32_t stride) {
 
   __m128i zero = _mm_setzero_si128();
@@ -625,123 +607,6 @@ __forceinline void copy_add_16to16_clpsrc_sse2(uint16_t* dst, int16_t* const src
       _mm_storeu_si128((__m128i*)(dst + pos), dst_vals);
     }
   }
-}
-
-#ifndef ARCH_IS_X86_64
-__forceinline void copy_add_16to16_clpsrc_xmm(uint16_t* dst, int16_t* const src, int32_t stride) {
-
-  stride = stride << 1;
-
-  __asm {
-
-    ALIGN 16
-
-    movdqa  xmm6, [lowB]  // 0x00ff   //xmmword ptr [ebx]                                
-    pxor    xmm7, xmm7   // zero value
-    mov     edx, dst    // read for add
-    mov     eax, dst    // write back
-    mov     esi, src
-    mov     ecx, stride
-
-
-    // Do first 3 rows (of 8x8 block)
-    movdqa  xmm0, [ESI]  // The source is aligned.
-    movupd  xmm1, [EDX]  // The destination is unaligned.
-
-    add     EDX, ecx
-    movdqa  xmm2, [ESI + 16]  // The source is aligned.
-    movupd  xmm3, [EDX]  // The destination is unaligned.
-
-    add     EDX, ecx
-    movdqa  xmm4, [ESI + 32]  // The source is aligned.
-    movupd  xmm5, [EDX]  // The destination is unaligned.
-
-
-    pmaxsw  xmm0, xmm7
-    pmaxsw  xmm2, xmm7
-
-    pminsw  xmm0, xmm6
-    pminsw  xmm2, xmm6
-
-    paddsw  xmm0, xmm1  // add 16bits with saturation.  
-    paddsw  xmm2, xmm3  // add 16bits with saturation.  
-
-    pmaxsw  xmm4, xmm7
-
-    movupd[EAX], xmm0  // The destination is unaligned.  MOVNTPS   
-    pminsw  xmm4, xmm6
-    add     EAX, ecx
-    paddsw  xmm4, xmm5  // add 16bits with saturation.  
-    movupd[EAX], xmm2  // The destination is unaligned.    
-    add     EAX, ecx
-    add     EDX, ecx
-    movupd[EAX], xmm4  // The destination is unaligned.    
-
-
-    // Do second 3 rows (of 8x8 block)
-    // The add EDX, ecx was done several lines previously.
-    movdqa  xmm0, [ESI + 48]  // The source is aligned.
-    movupd  xmm1, [EDX]       // The destination is unaligned.
-
-    add     EDX, ecx
-    movdqa  xmm2, [ESI + 64]  // The source is aligned.
-    movupd  xmm3, [EDX]       // The destination is unaligned.
-
-    add     EDX, ecx
-    movdqa  xmm4, [ESI + 80]  // The source is aligned.
-    movupd  xmm5, [EDX]       // The destination is unaligned.
-
-
-    pmaxsw  xmm0, xmm7
-    pmaxsw  xmm2, xmm7
-
-    pminsw  xmm0, xmm6
-    pminsw  xmm2, xmm6
-
-    paddsw  xmm0, xmm1  // add 16bits with saturation.  
-    paddsw  xmm2, xmm3  // add 16bits with saturation.  
-
-    add     EAX, ecx
-    pmaxsw  xmm4, xmm7
-
-    movupd[EAX], xmm0  // The destination is unaligned.    
-    pminsw  xmm4, xmm6
-    add     EAX, ecx
-    paddsw  xmm4, xmm5  // add 16bits with saturation.  
-    movupd[EAX], xmm2  // The destination is unaligned.    
-    add     EAX, ecx
-    add     EDX, ecx
-    movupd[EAX], xmm4  // The destination is unaligned.    
-
-
-    // Do the last 2 rows (of 8x8 block)
-    // The add EDX, ecx was done several lines previously.
-    movdqa  xmm0, [ESI + 96]  // The source is aligned.
-    movupd  xmm1, [EDX]  // The destination is unaligned.
-
-    add     EDX, ecx
-    movdqa  xmm2, [ESI + 112]  // The source is aligned.
-    movupd  xmm3, [EDX]  // The destination is unaligned.
-
-    pmaxsw  xmm0, xmm7
-    pmaxsw  xmm2, xmm7
-
-    pminsw  xmm0, xmm6
-    pminsw  xmm2, xmm6
-
-    add     EAX, ecx
-
-    paddsw  xmm0, xmm1  // add 16bits with saturation.  
-    paddsw  xmm2, xmm3  // add 16bits with saturation.  
-
-    movupd[EAX], xmm0  // The destination is unaligned.    
-    add     EAX, ecx
-    movupd[EAX], xmm2  // The destination is unaligned.                     
-
-    emms
-  }
-
-  return;
 }
 #endif
 
@@ -792,13 +657,14 @@ void quantDequant_shift14_c(int16_t* dct_block, const uint16_t* qtype1_matrix, c
 }
 
 __forceinline void quantDequant(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
   quantDequant_sse2(dct_block, qtype1_matrix, qtype1_matrix_quant);
 #else
-  quantDequant_xmm(dct_block, qtype1_matrix, qtype1_matrix_quant);
+  quantDequant_c(dct_block, qtype1_matrix, qtype1_matrix_quant); // for special case, quantDequant_shift14_c exists
 #endif
 }
 
+#ifdef INTEL_INTRINSICS
 __forceinline void quantDequant_sse2(int16_t* dct_block, const uint16_t* qtype1_matrix, const uint16_t* qtype1_matrix_quant) {
   __m128i low15bits_vec = _mm_set1_epi16(0x7FFF); // Mask for low 15 bits
   __m128i allFF_vec = _mm_set1_epi16(0xFFFF); // Mask for all bits set
@@ -841,94 +707,16 @@ __forceinline void quantDequant_sse2(int16_t* dct_block, const uint16_t* qtype1_
     _mm_store_si128((__m128i*) & dct_block[i * 8], xmm6); // Store result back to dct_block
   }
 }
-
-#ifndef ARCH_IS_X86_64
-__forceinline void quantDequant_xmm(int16_t* dct_block,
-  const uint16_t* qtype1_matrix,
-  const uint16_t* qtype1_matrix_quant) {
-
-
-  // xmm0 is level dct_block made positive
-  // xmm1 is qtype1_matrix
-  // xmm2 is qtype1_matrix_quant
-  // xmm3 is 
-  // xmm4 is temp register
-  // xmm5 is temp register
-  // xmm6 contains a mask of 1's if number was negative 
-  // xmm7 contains a mask of 1's if number was positive 
-  __asm {
-    ALIGN 16
-    mov     edx, dct_block
-    mov     esi, qtype1_matrix
-    mov     eax, qtype1_matrix_quant
-    mov     ecx, 128       // The loop counter. Length of dct_block (64 entries x 2 bytes per entry)
-
-
-    //   This is the first thing we want to compute 
-    //   level[i] = (dct_block[i] * qtype1_matrix[i] + 32768 )>>16;
-    movdqa   xmm0, [EDX]       // dct_block
-    movdqa   xmm6, xmm0         // temp dct_block
-    pand    xmm6, [low15bits]  // xmm6 == xmm0 then value was negative
-    MainLoop:
-    PCMPEQW xmm6, xmm0    // xmm6 positive value mask contains 1's if value is positive
-      movdqa   xmm7, xmm6
-      pxor  xmm7, [allFF] // xmm7 negative value mask now contains 1's if value is negative. 
-      pxor   xmm4, xmm4
-      movdqa   xmm1, [ESI]   // qtype1_matrix  
-      psubw   xmm4, xmm0    // xmm4 = 0 - xmm5
-      movdqa   xmm2, xmm7
-      pand    xmm0, xmm6    // xmm5 contains positive values that had been positive and 0 elsewhere
-      pand    xmm2, xmm4    // xmm2 contains positive values that had been negative and 0 elsewhere
-      PADDW   xmm2, xmm0    // xmm2 now only contains positive values
-
-      movdqa   xmm3, xmm2
-      pmullw   xmm3, xmm1
-      pmulhw   xmm2, xmm1
-
-      movdqa   xmm4, [negBit]
-      movdqa  xmm5, [EAX]
-      add     EAX, 16
-
-      pand    xmm3, xmm4
-      PSRLW   xmm3, 15           // If there was a bit leave it in low bit
-      PADDW   xmm2, xmm3
-
-      PMULLW  xmm2, xmm5         // level * qtype1_matrix_quant[i]                   
-      movdqa   xmm0, [EDX + 16]   // dct_block
-      movdqa   xmm5, xmm0         // temp dct_block
-      pand    xmm5, [low15bits]  // xmm6 == xmm0 then value was negative
-
-      add      ESI, 16
-      pxor   xmm4, xmm4
-      PSRAW   xmm2, 3            //  >> 3
-
-      psubw   xmm4, xmm2         // xmm4 = 0 - xmm2
-      pand    xmm7, xmm4
-      pand    xmm6, xmm2
-      PADDW   xmm6, xmm7
-      movdqa[EDX], xmm6
-      movdqa   xmm6, xmm5         // temp dct_block
-
-      add       EDX, 16
-      sub       ECX, 16
-      jnz       MainLoop
-
-      emms
-  }
-
-  return;
-}
 #endif
-
-
 __forceinline void transfer_8to16copy(int16_t* dst, uint8_t* src, uint32_t stride) {
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
   transfer_8to16copy_sse2(dst, src, stride);
 #else
-  transfer_8to16copy_xmm(dst, src, stride);
+  transfer_8to16copy_c(dst, src, stride);
 #endif
 }
 
+#ifdef INTEL_INTRINSICS
 __forceinline void transfer_8to16copy_sse2(int16_t* dst, uint8_t* src, uint32_t stride) {
   __m128i xmm0 = _mm_setzero_si128(); // Set xmm0 to zero
 
@@ -942,76 +730,7 @@ __forceinline void transfer_8to16copy_sse2(int16_t* dst, uint8_t* src, uint32_t 
     dst += 8; // Move to the next 8 words in dst
   }
 }
-
-#ifndef ARCH_IS_X86_64
-__forceinline void transfer_8to16copy_xmm(int16_t* dst, uint8_t* src, uint32_t stride) {
-
-  __asm {
-
-    ALIGN 16
-
-    mov     edx, dst
-    mov     esi, src
-    mov     ecx, stride
-
-
-    pxor    xmm0, xmm0
-
-    movq        mm1, [ESI]
-    add        ESI, ECX
-
-    movq        mm2, [ESI]
-    movq2dq    xmm1, mm1
-    add        ESI, ECX
-    movq2dq    xmm2, mm2
-    punpcklbw  xmm1, xmm0
-
-    movq        mm3, [ESI]
-    add        ESI, ECX
-    movdqa[EDX], xmm1
-    movq2dq    xmm3, mm3
-    punpcklbw  xmm2, xmm0
-
-    movq        mm4, [ESI]
-    add        ESI, ECX
-    movdqa[EDX + 16], xmm2
-    movq2dq    xmm4, mm4
-    punpcklbw  xmm3, xmm0
-
-    movq        mm5, [ESI]
-    add        ESI, ECX
-    movdqa[EDX + 32], xmm3
-    movq2dq    xmm5, mm5
-    punpcklbw  xmm4, xmm0
-
-    movq        mm6, [ESI]
-    add        ESI, ECX
-    movdqa[EDX + 48], xmm4
-    movq2dq    xmm6, mm6
-    punpcklbw  xmm5, xmm0
-
-    movq        mm7, [ESI]
-    add        ESI, ECX
-    movdqa[EDX + 64], xmm5
-    movq2dq    xmm7, mm7
-    punpcklbw  xmm6, xmm0
-
-    movq        mm1, [ESI]
-    movdqa[EDX + 80], xmm6
-    movq2dq    xmm1, mm1
-    punpcklbw  xmm7, xmm0
-    punpcklbw  xmm1, xmm0
-
-    movdqa[EDX + 96], xmm7
-    movdqa[EDX + 112], xmm1
-
-    emms
-  }
-
-  return;
-}
 #endif
-
 
 
 void transfer_8to16copy_c(int16_t* dst, uint8_t* src, uint32_t stride) {

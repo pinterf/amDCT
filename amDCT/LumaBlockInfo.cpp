@@ -867,8 +867,11 @@ uint32_t get_coeff8_energy_c(FrameInfo_args* FrameInfoArgs, uint8_t* src, int st
   src = src + startPix;
   transfer_8to16copy1_c(dct_block, src, stride);
 
-  //fdct_int32(dct_block);
+#ifdef INTEL_INTRINSICS
   fdct_sse2(dct_block); // based on fdct_sse2_skal
+#else
+  fdct_int32(dct_block);
+#endif
 
   return(coeff8_energy_c(dct_block));
 }

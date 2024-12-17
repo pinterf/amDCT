@@ -12,7 +12,9 @@
 #include "DispatchLoop.h"
 #include "Memory.h"
 
+#ifdef INTEL_INTRINSICS
 #include "emmintrin.h"
+#endif
 
 
 
@@ -315,9 +317,6 @@ int   Sharp(FrameInfo_args* FrameInfoArgs, int noRun) {
 
   FrameInfoArgs->qtype = save_qtype;
 
-#ifdef ARCH_IS_IA32
-  _mm_empty();
-#endif
   return(0);
 }
 

@@ -117,12 +117,11 @@ void copy_add_16to32_dctblk_c(int32_t* dst,   // 32bit frame.
 }
 
 void copy_add_16to16(uint16_t* dst, uint16_t* const src, int32_t len) {
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
   copy_add_16to16_sse2(dst, src, len);
 #else
-  copy_add_16to16_xmm(dst, src, len);
+  copy_add_16to16_c(dst, src, len);
 #endif
-  //copy_add_16to16_c(dst, src, len);
 }
 
 
@@ -157,45 +156,6 @@ void copy_add_16to16_sse2(uint16_t* dst, uint16_t* const src, int32_t len) {
 
 }
 
-#ifndef ARCH_IS_X86_64
-void copy_add_16to16_xmm(uint16_t* dst, uint16_t* const src, int32_t len) {
-  __asm {
-    ALIGN 16
-    mov     edx, dst
-    mov     esi, src
-    mov     ecx, len
-
-    MainLoop :
-    movapd    xmm0, [EDX]
-      movapd    xmm1, [ESI]
-      movapd    xmm2, [EDX + 16]
-      movapd    xmm3, [ESI + 16]
-      movapd    xmm4, [EDX + 32]
-      movapd    xmm5, [ESI + 32]
-      movapd    xmm6, [EDX + 48]
-      movapd    xmm7, [ESI + 48]
-
-      paddw     xmm0, xmm1
-      paddw     xmm2, xmm3
-      paddw     xmm4, xmm5
-      paddw     xmm6, xmm7
-
-      movapd[EDX], xmm0
-      movapd[EDX + 16], xmm2
-      movapd[EDX + 32], xmm4
-      movapd[EDX + 48], xmm6
-
-      add       EDX, 64
-      add       ESI, 64
-      sub       ECX, 32
-      jnz       MainLoop
-
-      emms
-  }
-
-  return;
-}
-#endif
 
 void copy_add3_16to16_c(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
   uint32_t num_iterations = len / 16;
@@ -208,14 +168,14 @@ void copy_add3_16to16_c(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t 
 }
 
 void copy_add3_16to16(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
   copy_add3_16to16_sse2(dst, src1, src2, len);
 #else
-  copy_add3_16to16_xmm(dst, src1, src2, len);
+  copy_add3_16to16_c(dst, src1, src2, len);
 #endif
-  //copy_add3_16to16_c(dst, src1, src2, len);
 }
 
+#ifdef INTEL_INTRINSICS
 void copy_add3_16to16_sse2(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
   __m128i* dst_ptr = (__m128i*)dst;
   __m128i* src1_ptr = (__m128i*)src1;
@@ -245,172 +205,19 @@ void copy_add3_16to16_sse2(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32
   }
 
 }
-
-#ifndef ARCH_IS_X86_64
-void copy_add3_16to16_xmm(uint16_t* dst, uint16_t* src1, uint16_t* src2, uint32_t len) {
-  __asm {
-    ALIGN 16
-    mov     edx, dst
-    mov     esi, src1
-    mov     eax, src2
-    mov     ecx, len
-    movapd    xmm1, [ESI]
-
-    MainLoop:
-    movapd    xmm0, [EDX]
-      movapd    xmm2, [EAX]
-
-      movapd    xmm3, [EDX + 16]
-      movapd    xmm4, [ESI + 16]
-      movapd    xmm5, [EAX + 16]
-
-      add       EAX, 32
-
-      paddw     xmm0, xmm1
-      paddw     xmm3, xmm4
-      paddw     xmm0, xmm2
-      paddw     xmm3, xmm5
-      movapd[EDX], xmm0
-      add       ESI, 32
-      movapd    xmm1, [ESI]
-      movapd[EDX + 16], xmm3
-
-      add       EDX, 32
-      sub       ECX, 16
-      jnz       MainLoop
-
-      emms
-  }
-
-  return;
-}
 #endif
 
-#if 0
-// not used
-void copy_add4_16to16_xmm(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
-  __asm {
-    ALIGN 16
-    push    ebx
 
-    mov     edx, dst
-    mov     esi, src1
-    mov     ebx, src2
-    mov     eax, src3
-    mov     ecx, len
-
-    MainLoop :
-    movapd    xmm0, [EDX]
-      movapd    xmm1, [ESI]
-      movapd    xmm2, [EBX]
-      movapd    xmm3, [EAX]
-
-      movapd    xmm4, [EDX + 16]
-      movapd    xmm5, [ESI + 16]
-      movapd    xmm6, [EBX + 16]
-      movapd    xmm7, [EAX + 16]
-
-      paddw     xmm0, xmm1
-      paddw     xmm0, xmm2
-      paddw     xmm0, xmm3
-
-      paddw     xmm4, xmm5
-      movapd[EDX], xmm0
-      paddw     xmm4, xmm6
-      paddw     xmm4, xmm7
-
-      add       EAX, 32
-      add       ESI, 32
-      add       EBX, 32
-      movapd[EDX + 16], xmm4
-
-      add       EDX, 32
-      sub       ECX, 16
-      jnz       MainLoop
-
-      pop    ebx
-      emms
-  }
-
-  return;
-}
-#endif
-
-#if 0
-// not used
-void working_copy_add4_16to16_xmm(uint16_t* dst, const uint16_t* const src1, const uint16_t* const src2, const uint16_t* const src3, uint32_t len) {
-  __asm {
-    ALIGN 16
-    mov     edx, dst
-    mov     esi, src1
-    mov     ebx, src2
-    mov     eax, src3
-    mov     ecx, len
-
-    MainLoop :
-    movapd       xmm0, [EDX]
-      movapd       xmm1, [ESI]
-      movapd       xmm2, [EBX]
-      movapd       xmm3, [EAX]
-      paddw     xmm0, xmm1
-      paddw     xmm0, xmm2
-      paddw     xmm0, xmm3
-      movapd[EDX], xmm0
-      add       EAX, 16
-      add       EDX, 16
-      add       ESI, 16
-      add       EBX, 16
-      sub       ECX, 8
-      jnz       MainLoop
-      emms
-  }
-
-  return;
-}
-#endif
-
-#if 0
-// not used
-//void copy_add4_16to16_mmx(uint16_t *dst, const uint16_t * const src1, const uint16_t * const src2, const uint16_t * const src3, uint32_t len){
-void copy_add4_16to16_mmx(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
-  __asm {
-    ALIGN 16
-    //     push ebx
-    mov     edx, dst
-    mov     esi, src1
-    mov     ebx, src2
-    mov     eax, src3
-    mov     ecx, len
-
-    MainLoop :
-    movq       mm0, [EDX]
-      movq       mm1, [ESI]
-      movq       mm2, [EBX]
-      movq       mm3, [EAX]
-      paddw     mm0, mm1
-      paddw     mm0, mm2
-      paddw     mm0, mm3
-      movq[EDX], mm0
-      add       EAX, 8
-      add       EDX, 8
-      add       ESI, 8
-      add       EBX, 8
-      sub       ECX, 4
-      jnz       MainLoop
-
-      //      pop ebx
-      emms
-  }
-
-  return;
-}
-#endif
 
 void copy_add4_16to16(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
+#ifdef INTEL_INTRINSICS
   copy_add4_16to16_sse2(dst, src1, src2, src3, len);
-  // copy_add4_16to16_c(dst, src1, src2, src3, len);
+#else
+  copy_add4_16to16_c(dst, src1, src2, src3, len);
+#endif
 }
 
+#ifdef INTEL_INTRINSICS
 void copy_add4_16to16_sse2(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
   __m128i* dst_ptr = (__m128i*)dst;
   __m128i* src1_ptr = (__m128i*)src1;
@@ -439,6 +246,7 @@ void copy_add4_16to16_sse2(uint16_t* dst, uint16_t* const src1, uint16_t* const 
     dst[i] = (uint16_t)(dst[i] + src1[i] + src2[i] + src3[i]);
   }
 }
+#endif
 
 void copy_add4_16to16_c(uint16_t* dst, uint16_t* const src1, uint16_t* const src2, uint16_t* const src3, uint32_t len) {
   for (uint32_t x = 0; x < len; x++) {

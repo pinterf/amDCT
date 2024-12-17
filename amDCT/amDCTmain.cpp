@@ -19,20 +19,14 @@
 #include "Font.h"
 
 #include <malloc.h>
+#ifdef INTEL_INTRINSICS
 #include "emmintrin.h"
-
-#ifdef ARCH_IS_IA32
-#define FREE_AND_RETURN_0            \
-  free_data(&FrameInfoArgs);       \
-  _aligned_free(pictSrcBufFull);   \
-  _mm_empty(); \
-  return(0);
-#else
-#define FREE_AND_RETURN_0            \
-  free_data(&FrameInfoArgs);       \
-  _aligned_free(pictSrcBufFull);   \
-  return(0);
 #endif
+
+#define FREE_AND_RETURN_0            \
+  free_data(&FrameInfoArgs);       \
+  _aligned_free(pictSrcBufFull);   \
+  return(0);
 
 
 // THESE ARE GLOBAL DEBUGGING VARIABLES
@@ -286,6 +280,7 @@ int   amDCTmain(
     // Workarounds for limitations in the quant dequant routines.
   if ((qtype == 1 || qtype == 11) && quant == 31) quant = 30;
   if (qtype == 3 && ncpu > 1) ncpu = 1;  // Workaround for bug in quant_mpeg_inter_mmx() and dequant_mpeg_inter_mmx() routines.
+  // fixme 2024 pinterf: those functin were rewritten, does this still apply?
   if (adapt_a == 31) { adapt = 30; adapt_a = 30; }
 
 
@@ -481,9 +476,6 @@ int   amDCTmain(
     //    DrawYV12(pdst, dst_height, dst_width, 0, 1, msgBuf);
 
     _aligned_free(pictSrcBufFull);
-#ifdef ARCH_IS_IA32
-    _mm_empty();
-#endif
     return(1); // Out of Memory
   }
 

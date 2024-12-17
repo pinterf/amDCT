@@ -34,7 +34,7 @@ typedef fdctFunc *fdctFuncPtr;
 extern fdctFuncPtr fdct;
 
 fdctFunc fdct_int32;
-#if defined(ARCH_IS_IA32) || defined(ARCH_IS_X86_64)
+#ifdef INTEL_INTRINSICS
 fdctFunc fdct_sse2;
 #endif
 

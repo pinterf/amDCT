@@ -995,16 +995,25 @@ int showBlockDetail(FrameInfo_args* FrameInfoArgs, uint8_t showMask) {
 //
 /////////////////////////////////////////////////////////////////////////////
 
-// YV12 has 1 bytes per pixel
+void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight) {
+#ifdef INTEL_INTRINSICS
+  UnDot_sse2(src_pit, dst_pit, row_size, srcp, dstp, FldHeight);
+#else
+  UnDot_c(src_pit, dst_pit, row_size, srcp, dstp, FldHeight);
+#endif
+}
+
+// YV12/16/24 has 1 bytes per pixel
 #undef  BPP
 #define BPP 1
 
-#ifdef USE_NEW_INTRINSICS
+#ifdef INTEL_INTRINSICS
+
 // This macro gets the high and low values of the 8 surrounding pixels. Register esi
 // is assumed to point one line above the target pixel and reg ebx is assumed to
 // contain the source pitch. Defined value BPP must be set to bytes per pixel,
 // either 1 for YV12 or 2 for YUY2. Answer returned in mm0, mm1
-#define GetMinMax(esi, ebx, mm0, mm1) \
+#define GetMinMax_sse2(esi, ebx, mm0, mm1) \
 { \
     __m128i above_left = _mm_loadl_epi64((__m128i*)(esi - BPP)); \
     __m128i above_center = _mm_loadl_epi64((__m128i*)(esi)); \
@@ -1030,7 +1039,7 @@ int showBlockDetail(FrameInfo_args* FrameInfoArgs, uint8_t showMask) {
     mm1 = _mm_max_epu8(mm1, bottom_right); \
 }
 
-void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight) {
+void UnDot_sse2(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight) {
   const uint8_t* pSrc = srcp;
   uint8_t* pDest = dstp;
   int y;
@@ -1050,7 +1059,7 @@ void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t*
     esi += BPP; // skip over first pixel
 
     __m128i mm1;
-    GetMinMax(esi, src_pit, mm0, mm1);
+    GetMinMax_sse2(esi, src_pit, mm0, mm1);
     mm0 = _mm_max_epu8(mm0, _mm_loadl_epi64((__m128i*)(esi + src_pit)));
     mm0 = _mm_min_epu8(mm0, mm1);
     _mm_storel_epi64((__m128i*)(edi + BPP), mm0);
@@ -1061,7 +1070,7 @@ void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t*
     _mm_storel_epi64((__m128i*)(edi + row_size - 8), mm0);
     esi -= BPP; // back up one pixel
 
-    GetMinMax(esi, src_pit, mm0, mm1);
+    GetMinMax_sse2(esi, src_pit, mm0, mm1);
     mm0 = _mm_max_epu8(mm0, _mm_loadl_epi64((__m128i*)(esi + src_pit)));
     mm0 = _mm_min_epu8(mm0, mm1);
     _mm_storel_epi64((__m128i*)(edi + row_size - BPP - 8), mm0);
@@ -1074,7 +1083,7 @@ void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t*
       esi += 8; // bump to next qword
       edi += 8;
 
-      GetMinMax(esi, src_pit, mm0, mm1);
+      GetMinMax_sse2(esi, src_pit, mm0, mm1);
       mm0 = _mm_max_epu8(mm0, _mm_loadl_epi64((__m128i*)(esi + src_pit)));
       mm0 = _mm_min_epu8(mm0, mm1);
       _mm_storel_epi64((__m128i*)edi, mm0); // and store it
@@ -1087,112 +1096,94 @@ void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t*
   }
 
 }
+#endif
 
-#else
-// This macro gets the high and low values of the 8 surrounding pixels. Register esi
-// is assumed to point one line above the target pixel and reg ebx is assumbed to
-// contain the source pitch. Defined value BPP must be set to bytes per pixel,
-// either 1 for YV12 or 2 for YUY2. Answer returned in mm0, mm1
-#define GetMinMax \
-__asm { \
-    __asm movq  mm0, qword ptr[esi-BPP]      /* Above left, mm0 will hold min */ \
-    __asm movq  mm1, mm0            /* Above left, mm1 will hold max */ \
-    __asm pminub mm0, qword ptr[esi]      /* above center */ \
-    __asm pmaxub mm1, qword ptr[esi]      /* above center */ \
-    __asm pminub mm0, qword ptr[esi+BPP]    /* above right */ \
-    __asm pmaxub mm1, qword ptr[esi+BPP]    /* above right */ \
-    __asm pminub mm0, qword ptr[esi+ebx-BPP]  /* left */ \
-    __asm pmaxub mm1, qword ptr[esi+ebx-BPP]  /* left */ \
-    __asm pminub mm0, qword ptr[esi+ebx+BPP]  /* right */ \
-    __asm pmaxub mm1, qword ptr[esi+ebx+BPP]  /* right */ \
-    __asm pminub mm0, qword ptr[esi+2*ebx-BPP]  /* bottom left */ \
-    __asm pmaxub mm1, qword ptr[esi+2*ebx-BPP]  /* bottom left */ \
-    __asm pminub mm0, qword ptr[esi+2*ebx]    /* bottom center */ \
-    __asm pmaxub mm1, qword ptr[esi+2*ebx]    /* bottom center */ \
-    __asm pminub mm0, qword ptr[esi+2*ebx+BPP]  /* bottom right */ \
-    __asm pmaxub mm1, qword ptr[esi+2*ebx+BPP]  /* bottom right */ \
+void GetMinMax_c(const uint8_t *esi, int stride, int &min, int &max)
+{ \
+    int above_left = esi[-BPP];
+    int above_center = esi[0];
+    int above_right = esi[BPP];
+    int left = esi[stride - BPP];
+    int right = esi[stride + BPP];
+    int bottom_left = esi[2 * stride - BPP];
+    int bottom_center = esi[2 * stride];
+    int bottom_right = esi[2 * stride + BPP];
+    min = MIN(above_left, above_center);
+    max = MAX(above_left, above_center);
+    min = MIN(min, above_right);
+    max = MAX(max, above_right);
+    min = MIN(min, left);
+    max = MAX(max, left);
+    min = MIN(min, right);
+    max = MAX(max, right);
+    min = MIN(min, bottom_left);
+    max = MAX(max, bottom_left);
+    min = MIN(min, bottom_center);
+    max = MAX(max, bottom_center);
+    min = MIN(min, bottom_right);
+    max = MAX(max, bottom_right);
 }
 
-
-void UnDot(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight)
-{
-
+// dummy conversion back from sse2
+void UnDot_c(int src_pit, int dst_pit, int row_size, const uint8_t* srcp, uint8_t* dstp, int FldHeight) {
   const uint8_t* pSrc = srcp;
   uint8_t* pDest = dstp;
   int y;
 
-  memcpy(pDest, pSrc, row_size);    // copy first line
-  memcpy(pDest + dst_pit * (FldHeight - 1),
-    pSrc + src_pit * (FldHeight - 1), row_size);  // and last
+  memcpy(pDest, pSrc, row_size); // copy first line
+  memcpy(pDest + dst_pit * (FldHeight - 1), pSrc + src_pit * (FldHeight - 1), row_size); // and last
   pDest += dst_pit;
 
-  for (y = 1; y <= FldHeight - 2; y++)
-  {
-    __asm
-    {
-      // Loop general reg usage
-      //
-      // ecx - count
-      // edi - dest pixels
-      // esi - src pixels, 1 line up
+  for (y = 1; y <= FldHeight - 2; y++) {
+    const uint8_t* esi = pSrc;
+    uint8_t* edi = pDest;
+    int ecx = row_size; // do 1 bytes at a time
 
-      mov    esi, pSrc
-      mov    ebx, src_pit
-      mov    edi, pDest
-      mov    eax, row_size
-      mov    ecx, eax
-      shr    ecx, 3            // do 8 bytes at a time
+    int mm0, mm1;
 
-      // do first  qword
-      movq  mm0, qword ptr[esi + ebx]    // move 1st 4 pixels
-      movq  qword ptr[edi], mm0
-      add    esi, BPP          // skip over first pixel
-      GetMinMax
-      pmaxub  mm0, qword ptr[esi + ebx]    // allow no lower than min
-      pminub  mm0, mm1          // allow no higher than max
-      movq  qword ptr[edi + BPP], mm0
+    // do first pixel
+    edi[0] = esi[src_pit];
+    esi += BPP; // skip over first pixel
 
-      // do last qword
-      lea    esi, [esi + eax - 8 - BPP]    // point at last qword
-      movq  mm0, qword ptr[esi + ebx]    // move 1st 4 pixels
-      movq  qword ptr[edi + eax - 8], mm0
-      sub    esi, BPP          // back up one pixel
-      //GetMinMax
-      pmaxub  mm0, qword ptr[esi + ebx]    // allow no lower than min
-      pminub  mm0, mm1          // allow no higher than max
-      movq  qword ptr[edi + eax - BPP - 8], mm0
+    // this was for quadword in sse2, dunno if still needed, just replaced 8 bytes with only 1
+    GetMinMax_c(esi, src_pit, mm0, mm1);
+    mm0 = MAX(mm0, esi[src_pit]);
+    mm0 = MIN(mm0, mm1);
+    edi[BPP] = mm0;
 
-      mov    esi, pSrc          // restore esi
-      sub    ecx, 1            // but both ends done manually
-      jz    AllDoneYV12          // too short, don't bother
+    // do last pixel
+    esi += row_size - 1 - BPP; // point at last
+    mm0 = esi[src_pit];
+    edi[row_size - 1] = mm0;
+    esi -= BPP; // back up one pixel
 
-      LoopYV12 :
-      add    esi, 8            // bump to next qword
-        add    edi, 8
+    // this was for quadword in sse2, dunno if still needed, just replaced 8 bytes with only 1
+    GetMinMax_c(esi, src_pit, mm0, mm1);
+    mm0 = MAX(mm0, esi[src_pit]);
+    mm0 = MIN(mm0, mm1);
+    edi[row_size - BPP - 1] = mm0;
 
-        GetMinMax
-        pmaxub  mm0, qword ptr[esi + ebx]    // allow no lower than min
-        pminub  mm0, mm1          // allow no higher than max
-        movntq  qword ptr[edi], mm0      // and store it
-        loop  LoopYV12
+    esi = pSrc; // restore esi
+    ecx -= 1; // but both ends done manually
+    if (ecx == 0) goto AllDoneYV12; // too short, don't bother
 
-        AllDoneYV12 :
+    while (ecx--) {
+      esi += 1; // bump to next
+      edi += 1;
+
+      GetMinMax_c(esi, src_pit, mm0, mm1);
+      mm0 = MAX(mm0, esi[src_pit]);
+      mm0 = MIN(mm0, mm1);
+      edi[0] = mm0; // and store it
     }
 
+  AllDoneYV12:
     // adjust for next line
     pSrc += src_pit;
     pDest += dst_pit;
   }
 
-
-  return;
 }
-
-#endif
-
-
-
-
 
 
 // This code was taken and slightly modified from decomb filter package by
