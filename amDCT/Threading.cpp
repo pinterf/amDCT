@@ -1,5 +1,3 @@
-#include <process.h>
-
 #include "amDCT.h"
 #include "Threading.h"
 #include "DctLoop.h"
