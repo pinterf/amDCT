@@ -247,37 +247,6 @@ void deblock_vert_DoDC(uint8_t* image, int height, int width, int stride, int qu
       //            : QP_store[y/16*QP_stride+Bx/8];  
       //      QPx16 = 16 * QP;
       v = &(image[y * stride + Bx]) - 5 * stride;
-
-      //      #ifdef PREFETCH_AHEAD_V
-      //      /* try a prefetch PREFETCH_AHEAD_V bytes ahead on all eight rows... experimental */
-      //      prefetch_addr = v + PREFETCH_AHEAD_V;
-      //      __asm 
-      //      {
-      //        push eax
-      //        push ebx
-      //        mov eax, prefetch_addr
-      //        mov ebx, stride
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        add      eax , ebx        /* prefetch_addr+= stride */
-      //        prefetcht0 [eax]           
-      //        pop ebx
-      //        pop eax
-      //      };
-      //      #endif
-
             /* decide whether to use DC mode on a block-by-block basis */
       useDC = deblock_vert_useDC(v, stride, moderate_v);
 
@@ -930,13 +899,10 @@ void deblock_vert_choose_p1p2_sse2(uint8_t* v, int stride, uint64_t* p1p2, int Q
   mm0 = _mm_or_si128(mm0, mm1); // mm0 |= mm1
   mm1 = mm0; // make a copy of mm0
 
-  // Now we have our result, p1, in mm0. Next, unpack.
-  mm0 = _mm_unpacklo_epi8(mm0, mm7); // low bytes to mm0
-  mm1 = _mm_unpackhi_epi8(mm1, mm7); // high bytes to mm1
-
+  // Now we have our result, p1, in mm0.
+  mm0 = _mm_unpacklo_epi8(mm0, mm7);
   // Store p1 in memory
-  _mm_store_si128((__m128i*) & p1p2[0], mm0); // low words to p1p2[0]
-  _mm_store_si128((__m128i*) & p1p2[1], mm1); // high words to p1p2[1]
+  _mm_store_si128((__m128i*) & p1p2[0], mm0); // write 2x4 words to p1p2[0..1]
 
   // p2
   mm1 = _mm_loadl_epi64((__m128i*)pmm2); // mm1 = *pmm2 = v[l8]
@@ -959,13 +925,10 @@ void deblock_vert_choose_p1p2_sse2(uint8_t* v, int stride, uint64_t* p1p2, int Q
   mm0 = _mm_or_si128(mm0, mm1); // mm0 |= mm1
   mm1 = mm0; // make a copy of mm0
 
-  // Now we have our result, p2, in mm0. Next, unpack.
-  mm0 = _mm_unpacklo_epi8(mm0, mm7); // low bytes to mm0
-  mm1 = _mm_unpackhi_epi8(mm1, mm7); // high bytes to mm1
-
+  // Now we have our result, p2, in mm0.
+  mm0 = _mm_unpacklo_epi8(mm0, mm7);
   // Store p2 in memory
-  _mm_store_si128((__m128i*) & p1p2[2], mm0); // low words to p1p2[2]
-  _mm_store_si128((__m128i*) & p1p2[3], mm1); // high words to p1p2[3]
+  _mm_store_si128((__m128i*) & p1p2[2], mm0); // write 2x4 words to p1p2[2..3]
 
 #ifdef PP_SELF_CHECK
   /* check p1 and p2 have been calculated correctly */
