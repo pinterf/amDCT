@@ -13,7 +13,16 @@ Only 8 bit YUV(A) or greyscale formats are supported.
 
 See documentation separately.
 
+Build intructions: see below.
+
 ## Changelog
+- (20241217) v1.4.2 (no release)
+
+  - Source: remove mmx, threading to c++17 to make it more gcc/minGW friendly
+  - gcc/minGW build possible
+  - C only (zero Intel Intrinsics dependency) is possible by not defining "INTEL_INTRINSICS"
+  - Add CMake build environment
+
 - (20241210) v1.4.2
   - Rewrite all external assembly codes (fdct, idct, h263 and mpeg quant-dequants) to Intel intrinsics.
     It's now quicker - sometimes significantly - than the original.
@@ -68,9 +77,87 @@ Future todo:
   - Further code cleanup, remove redundant parameter checks, organize program structure to 
     multi Avisynth-Vaporsynth friendly
   - Reports MT Mode for Avisynth+: MT_NICE_FILTER or MT_???
-  - Support other compilers than MSVC
-  - Linux, etc. support
-  - CMake build environment
+
+
+## Build instructions
+
+Build instructions
+==================
+VS2022: 
+
+  preferably use the ready-made .sln solution file from Visual Studio IDE
+  
+  or see below other command line possibilities
+
+Note: for Windows builds, first make a build folder from project root in order to not overwrite my
+'official' .sln and vcxproj files.
+
+Windows GCC (mingw installed by msys2):
+  from the 'build' folder under project root:
+
+  del .\CMakeCache.txt
+  del ..\CMakeCache.txt
+  cmake .. -G "MinGW Makefiles" -DENABLE_INTEL_SIMD:bool=on
+  @rem test: cmake .. -G "MinGW Makefiles" -DENABLE_INTEL_SIMD:bool=off
+  cmake --build . --config Release --clean-first
+
+Windows Intel C++ Compiler 2025:
+
+  del ..\CMakeCache.txt
+  del .\CMakeCache.txt
+  C:\Program Files (x86)\Intel\oneAPI\setvars.bat
+  cmake ../ -T "Intel C++ Compiler 2025" -DCMAKE_CXX_COMPILER="icx.exe"
+  cmake --build . --config Release --clean-first
+
+Windows MSVC v141_xp toolset:
+
+  del ..\CMakeCache.txt
+  del .\CMakeCache.txt
+  C:\Program Files (x86)\Intel\oneAPI\setvars.bat
+  cmake .. -G "Visual Studio 17 2022" -A x64 -T "v141_xp" -DWINXP_SUPPORT:bool=on -DENABLE_INTEL_SIMD:bool=ON
+  cmake --build . --config Release --clean-first
+
+Windows MSVC (C only - no Intel SSE2 codes - test):
+
+  del ..\CMakeCache.txt
+  del .\CMakeCache.txt
+  C:\Program Files (x86)\Intel\oneAPI\setvars.bat
+  cmake .. -G "Visual Studio 17 2022" -A x64 -DENABLE_INTEL_SIMD:bool=off
+  cmake --build . --config Release --clean-first
+
+Linux
+  from the 'build' folder under project root:
+  ENABLE_INTEL_SIMD is automatically off for non x86 arhitectures
+
+* Clone repo and build
+    
+        git clone https://github.com/pinterf/amDCT
+        cd amDCT
+        cmake -B build -S .
+        cmake --build build
+
+  Useful hints:        
+   build after clean:
+
+        cmake --build build --clean-first
+
+   Force no asm support
+
+        cmake -B build -S . -DENABLE_INTEL_SIMD:bool=off
+
+   delete cmake cache
+
+        rm build/CMakeCache.txt
+
+* Find binaries at
+    
+        build/amDCT/amDCT.so
+
+* Install binaries
+
+        cd build
+        sudo make install
+
 
 ## Links
 
