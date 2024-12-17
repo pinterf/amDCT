@@ -8,7 +8,7 @@
 
 void setShift(uint8_t starti, uint8_t startj, FrameInfo_args* args);
 void startDctLoop(FrameInfo_args* args);
-unsigned int __stdcall DctLoopThread(DctLoop_args* args);
+void DctLoopThread(DctLoop_args* args);
 
 
 #endif // _THREADING_H_

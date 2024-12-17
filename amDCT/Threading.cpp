@@ -4,8 +4,9 @@
 #include "Threading.h"
 #include "DctLoop.h"
 #include "transfer_add.h"
-#include <threads.h>
-#include <stdint.h>
+#include <thread>
+#include <vector>
+#include <cstdint>
 
 
 
@@ -27,18 +28,29 @@ void setShift(uint8_t        starti,
 
 
 
+// This is called once per thread by _beginthreadex() above.
+// It unpacks the shift information the thread is supposed to process.
+// It then does a regular call to doDctLoop() for each shift the thread is supposed to process.
+// Thread worker function
+void DctLoopThread(DctLoop_args* args) {
+  for (auto i = args->startShift; i <= args->endShift; i++) {
+    int starti = args->starti[i];
+    int startj = args->startj[i];
+    DctLoop(starti, startj, args);
+  }
+}
+
 // This distributes the shift information into ncpu groups which are assigned and dispatched to ncpu threads.
 // It then collects and combines the returned information from each thread.
 
-int dct_loop_wrapper(void* arg) {
-  DctLoopThread((DctLoop_args *)arg);
-  return 0;
-}
 
 void startDctLoop(FrameInfo_args* args) {
   DctLoop_args* DctLoopArgs = &args->MemoryArgs->DctLoopArgs[0];
   uint8_t ncpu = DctLoopArgs->ncpu;
-  thrd_t threads[4];
+
+  std::vector<std::thread> threads;
+  threads.reserve(ncpu);
+
   // This provides the first approximation of the number of shiftsPerThread
   uint8_t shiftsPerThread = DctLoopArgs->cntShift / ncpu;
 
@@ -84,12 +96,14 @@ void startDctLoop(FrameInfo_args* args) {
     }
   }
 
+  // Launch threads
   for (uint8_t k = 0; k < ncpu; k++) {
-    thrd_create(&threads[k], dct_loop_wrapper, &args->MemoryArgs->DctLoopArgs[k]);
+    threads.emplace_back(DctLoopThread, &args->MemoryArgs->DctLoopArgs[k]);
   }
 
-  for (uint8_t k = 0; k < ncpu; k++) {
-    thrd_join(threads[k], NULL);
+  // Join all threads
+  for (auto& thread : threads) {
+    thread.join();
   }
 
   const uint32_t len = args->sizeBlocksWork;
@@ -119,23 +133,4 @@ void startDctLoop(FrameInfo_args* args) {
   }
   }
 }
-
-// This is called once per thread by _beginthreadex() above.
-// It unpacks the shift information the thread is supposed to process.
-// It then does a regular call to doDctLoop() for each shift the thread is supposed to process.
-unsigned int  __stdcall
-DctLoopThread(DctLoop_args* args) {
-
-  unsigned int i;
-
-  for (i = args->startShift; i <= args->endShift; i++) {
-    int starti = args->starti[i];
-    int startj = args->startj[i];
-
-    DctLoop(starti, startj, args);
-  }
-
-  return(0);
-}
-
 
