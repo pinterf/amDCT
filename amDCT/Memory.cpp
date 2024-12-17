@@ -1,4 +1,10 @@
 #include "avs/config.h"
+#if (defined(GCC) || defined(CLANG)) && !defined(_WIN32)
+#include <stdlib.h>
+#define _aligned_malloc(size, alignment) aligned_alloc(alignment, size)
+#define _aligned_free(ptr) free(ptr)
+#endif
+
 #include "Memory.h"
 #include "amDCT.h"      // needed for BLKSIZE
 #include "amDCTtypedefs.h"
