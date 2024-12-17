@@ -2,7 +2,6 @@
 // which contained both fdct and idct implementations
 
 #include <stdint.h>
-#include <intrin.h>
 #include <emmintrin.h>
 #include "fdct.h"
 
