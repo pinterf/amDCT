@@ -1,21 +1,9 @@
 
-#include "windows.h"
 #include "avisynth.h"
 
 #include "amDCT.h"
 
 #define ALIGN 16
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-  int __cdecl compare_lpf9_all(void);
-  int __cdecl compare_dering_all(void);
-  int __cdecl compare_lpf9_vert_all(void);
-#ifdef __cplusplus
-}
-#endif
 
 /****************************
  * The following is the header definitions.
