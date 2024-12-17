@@ -4,9 +4,33 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 #extra build folders
-[Bb]uild
-CMakeFiles/
+#and cmake generated files
+[Bb]uild/*
 makefile
+amdct-build/*
+CMakeCache.txt
+CMakeFiles/*
+amDCT/CMakeCache.txt
+amDCT/CMakeFiles/*
+cmake_install.cmake
+cmake_uninstall.cmake
+generate.stamp
+generate.stamp.depend
+# in Windows we have ready made sln and vcxproj, these are commented out
+#*.sln
+#*.vcxproj
+#*.vcxproj.filters
+
+out/*
+debug/*
+output/*
+release/*
+win32/*
+x64/*
+avscore/debug
+avscore/release/*
+avscore/win32/*
+avscore/x64/*
 
 
 # User-specific files
