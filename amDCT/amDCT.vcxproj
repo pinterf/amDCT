@@ -17,6 +17,14 @@
       <Configuration>ReleaseClangcl</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseXP|Win32">
+      <Configuration>ReleaseXP</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseXP|x64">
+      <Configuration>ReleaseXP</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -30,13 +38,20 @@
     <ProjectGuid>{E663131F-DAF1-4143-B5D6-FA4AC403D799}</ProjectGuid>
     <RootNamespace>amDCT</RootNamespace>
     <Keyword>Win32Proj</Keyword>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>7.0</WindowsTargetPlatformVersion>
     <ProjectName>amDCT</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <PlatformToolset>v143</PlatformToolset>
+    <UseOfMfc>false</UseOfMfc>
+    <UseOfAtl>false</UseOfAtl>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v141_xp</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <UseOfAtl>false</UseOfAtl>
     <CharacterSet>MultiByte</CharacterSet>
@@ -51,6 +66,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <PlatformToolset>v143</PlatformToolset>
+    <UseOfMfc>false</UseOfMfc>
+    <UseOfAtl>false</UseOfAtl>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v141_xp</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <UseOfAtl>false</UseOfAtl>
     <CharacterSet>MultiByte</CharacterSet>
@@ -81,10 +103,16 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|x64'" Label="PropertySheets">
@@ -110,6 +138,16 @@
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|Win32'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+    <ExecutablePath>$(WindowsSdk_71A_ExecutablePath_x86);$(VC_ExecutablePath_x86);$(CommonExecutablePath)</ExecutablePath>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSdk_71A_LibraryPath_x86);</LibraryPath>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|Win32'">
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\</IntDir>
@@ -127,6 +165,16 @@
     <ExecutablePath>$(VC_ExecutablePath_x64);$(CommonExecutablePath)</ExecutablePath>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);</LibraryPath>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|x64'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+    <ExecutablePath>$(WindowsSdk_71A_ExecutablePath_x64);$(VC_ExecutablePath_x64);$(CommonExecutablePath)</ExecutablePath>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSdk_71A_LibraryPath_x64);</LibraryPath>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
@@ -164,7 +212,6 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <EnablePREfast>true</EnablePREfast>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <ModuleOutputFile>$(IntDir)</ModuleOutputFile>
@@ -191,7 +238,6 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <EnablePREfast>true</EnablePREfast>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ExceptionHandling>Async</ExceptionHandling>
@@ -226,11 +272,56 @@
       <DebugInformationFormat />
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
-      <EnablePREfast>true</EnablePREfast>
       <AssemblerOutput>NoListing</AssemblerOutput>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <ProjectReference>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <Link>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(IntDir)amDCT.dll</OutputFile>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <AddModuleNamesToAssembly>
+      </AddModuleNamesToAssembly>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalOptions>/LTCG</AdditionalOptions>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|Win32'">
+    <ClCompile>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <PreprocessorDefinitions>INTEL_INTRINSICS;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
+      <AssemblerOutput>NoListing</AssemblerOutput>
+      <LanguageStandard_C>Default</LanguageStandard_C>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/Zc:threadSafeInit- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ProjectReference>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
@@ -272,7 +363,6 @@
       </DebugInformationFormat>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
-      <EnablePREfast>true</EnablePREfast>
       <AssemblerOutput>NoListing</AssemblerOutput>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -318,11 +408,55 @@
       </DebugInformationFormat>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
-      <EnablePREfast>true</EnablePREfast>
       <AssemblerOutput>NoListing</AssemblerOutput>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <ProjectReference>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
+    <Link>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(IntDir)amDCT.dll</OutputFile>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <AddModuleNamesToAssembly>
+      </AddModuleNamesToAssembly>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <AdditionalOptions>/LTCG</AdditionalOptions>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|x64'">
+    <ClCompile>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <PreprocessorDefinitions>INTEL_INTRINSICS;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
+      <AssemblerOutput>NoListing</AssemblerOutput>
+      <LanguageStandard_C>Default</LanguageStandard_C>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/Zc:threadSafeInit- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ProjectReference>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
@@ -363,7 +497,6 @@
       </DebugInformationFormat>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
-      <EnablePREfast>true</EnablePREfast>
       <AssemblerOutput>NoListing</AssemblerOutput>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -398,8 +531,10 @@
     <ClInclude Include="blindPPcode.h" />
     <ClInclude Include="BuildPerBlockMatrix.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="BuildPreCompVals.h" />
@@ -435,8 +570,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseXP|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseClangcl|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="BuildPreCompVals.cpp" />
